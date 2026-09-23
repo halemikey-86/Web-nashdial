@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { click, pluck, usePlayback } from '../audio';
 import { Neck } from '../components/Neck';
-import { fretX, stringY } from '../components/neckGeometry';
+import { GUITAR_NECK, fretX, stringY } from '../components/neckGeometry';
 import { PageHeader } from '../components/ui';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { openStringMidi, DEFAULT_TUNING } from '../music/tunings';
@@ -100,8 +100,8 @@ function ExercisePlayer({ exercise }: { exercise: Exercise }) {
         <Neck stringCount={STRINGS} fromFret={from} toFret={to} vibrating={new Set([current.s])} label="Finger animation">
           {([1, 2, 3, 4] as const).map((n) => {
             const pos = hand.fingers[n];
-            const x = fretX(pos.f);
-            const y = stringY(pos.s, STRINGS, x);
+            const x = fretX(GUITAR_NECK, pos.f);
+            const y = stringY(GUITAR_NECK, pos.s, STRINGS, x);
             return (
               <g key={n} className={`finger${pos.pressed ? ` finger--pressed` : ``}`} style={{ transform: `translate(${x}px, ${y}px)` }}>
                 <g className="finger__lift">
@@ -114,7 +114,7 @@ function ExercisePlayer({ exercise }: { exercise: Exercise }) {
             );
           })}
           {current.tech && (
-            <text className="finger__tech" x={fretX(current.f)} y={stringY(current.s, STRINGS, fretX(current.f)) - 40}>
+            <text className="finger__tech" x={fretX(GUITAR_NECK, current.f)} y={stringY(GUITAR_NECK, current.s, STRINGS, fretX(GUITAR_NECK, current.f)) - 40}>
               {current.tech === `h` ? `hammer` : `pull`}
             </text>
           )}

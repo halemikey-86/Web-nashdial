@@ -717,3 +717,284 @@ text.neck-marker--mute {
     width: 100%;
   }
 }
+
+/* ---------- Tetris piece icons ---------- */
+
+.piece-icon {
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 0 #0006);
+}
+.shape-chip {
+  padding-left: 8px;
+}
+
+/* ---------- Upright neck for chord shapes ---------- */
+
+.neck--vertical {
+  overflow: visible;
+}
+.neck--vertical .neck__svg {
+  width: min(100%, 300px);
+  min-width: 0;
+  margin: 0 auto;
+}
+.live__neck--chord .neck--vertical .neck__svg {
+  width: auto;
+  max-width: 100%;
+  height: clamp(280px, calc(100dvh - 420px), 560px);
+}
+.chord-shapes__neck {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.chord-shapes__chord {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  color: var(--theme-text);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.chord-shapes__meta {
+  color: var(--theme-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- Capo guide ---------- */
+
+.capo-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--theme-text);
+}
+.capo-guide__title {
+  margin: 0;
+  font-size: 0.78rem;
+}
+.capo-guide__chords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.capo-guide__chord {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
+  padding: 4px 6px;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 4px;
+  background: var(--theme-control-bg);
+}
+.capo-guide__shape {
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+.capo-guide__sounds {
+  color: var(--theme-text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.capo-guide__legend {
+  margin: 0;
+  color: var(--theme-text-muted);
+  font-size: 0.62rem;
+}
+.capo-guide__easy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.capo-guide__easy-label {
+  color: var(--theme-label);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.capo-guide__option {
+  min-height: 28px;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+}
+.capo-guide__option--on {
+  background: var(--theme-tab-active);
+  box-shadow: 0 0 0 2px var(--theme-accent);
+}
+@media (width>=960px) {
+  .app__col-controls .capo-guide__chord {
+    min-width: 38px;
+    padding: 2px 4px;
+  }
+  .app__col-controls .capo-guide__shape {
+    font-size: 0.78rem;
+  }
+}
+
+/* ---------- Theory tab ---------- */
+
+.theory {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  align-content: start;
+  padding-bottom: 8px;
+  color: var(--theme-text);
+}
+.theory__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 6px;
+  background: var(--theme-control-bg);
+}
+.theory__title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.theory__formula {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.theory__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.theory__note {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 34px;
+  padding: 4px;
+  border-radius: 4px;
+  background: var(--theme-tab-active);
+}
+.theory__note--root {
+  box-shadow: inset 0 0 0 2px var(--theme-accent);
+}
+.theory__note-name {
+  font-weight: 800;
+}
+.theory__note-degree {
+  color: var(--theme-text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.theory__gap {
+  color: var(--theme-accent);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+.theory__hint {
+  margin: 0;
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+}
+.theory__facts {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.theory__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.theory__table th {
+  color: var(--theme-label);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.theory__table td,
+.theory__table th {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--theme-control-border);
+}
+.theory__degree {
+  color: var(--theme-accent);
+  font-weight: 800;
+}
+.theory__tones {
+  font-family: var(--sheet-mono);
+  font-size: 0.75rem;
+}
+.theory__muted {
+  display: block;
+  color: var(--theme-text-muted);
+  font-size: 0.68rem;
+}
+.theory__row--out {
+  opacity: 0.5;
+}
+.theory__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.theory__progressions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.theory__progression {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.theory__prog-name {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.theory__prog-chords {
+  display: block;
+  font-family: var(--sheet-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Desktop: chord pickers on the left, the upright neck on the right, sized to the space left. */
+@media (width>=960px) {
+  .chord-shapes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto 1fr;
+    column-gap: 20px;
+    align-items: start;
+  }
+  .chord-shapes__legend,
+  .chord-shapes__degree-pick,
+  .chord-shapes__shape-pick {
+    grid-column: 1;
+  }
+  .chord-shapes__diagram {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+  }
+  .chord-shapes__neck .neck--vertical .neck__svg {
+    width: auto;
+    height: max(260px, calc(100dvh - 590px));
+    max-width: none;
+  }
+}

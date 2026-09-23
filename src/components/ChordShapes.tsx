@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CAGED, lowestShape, resolveShape, type CagedShape } from '../music/chordShapes';
 import { diatonicChords } from '../music/scales';
 import type { Tuning } from '../music/tunings';
-import { ChordDiagram } from './ChordDiagram';
+import { ChordNeck } from './ChordNeck';
 
 interface ChordShapesProps {
   root: string;
@@ -49,7 +49,8 @@ export function ChordShapes({ root, scaleId, tuning, capoFret = 0 }: ChordShapes
           </li>
         </ul>
         <p className="chord-shapes__legend-note">
-          Strings run <strong>E → e</strong> (thick to thin). Numbers are <strong>actual frets</strong> on the neck
+          The neck stands upright: nut at the top, <strong>low E on the left → high e on the right</strong>. Numbers are{' '}
+          <strong>actual frets</strong>
           {capoFret > 0 && <> — ○ at fret {capoFret} means open against the capo</>}.
         </p>
       </div>
@@ -83,7 +84,16 @@ export function ChordShapes({ root, scaleId, tuning, capoFret = 0 }: ChordShapes
       </div>
       <div className="chord-shapes__diagram">
         {resolved ? (
-          <ChordDiagram chordLabel={chord.label} resolved={resolved} capoFret={capoFret} large />
+          <div className="chord-shapes__neck">
+            <p className="chord-shapes__chord">
+              {chord.label}
+              <span className="chord-shapes__meta">
+                {shape} shape{resolved.baseFret > 0 ? ` · fret ${resolved.baseFret}` : ``}
+                {capoFret > 0 ? ` · capo ${capoFret}` : ``}
+              </span>
+            </p>
+            <ChordNeck resolved={resolved} stringCount={tuning.strings.length} capo={capoFret} />
+          </div>
         ) : (
           <p className="chord-shapes__unavailable">
             No playable {shape} shape for {chord.label} in this tuning

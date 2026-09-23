@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { KeyDial } from '../components/KeyDial';
+import { CapoGuide } from '../components/CapoGuide';
 import { CapoSelector } from '../components/Selectors';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { noteIndex } from '../music/notes';
@@ -220,6 +221,7 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
             </p>
             {keyNote && <p className="stage__key-note">{keyNote}</p>}
             <CapoSelector capoFret={capo} onChange={onCapoChange} id="stage-capo" />
+            <CapoGuide keyIndex={playKey} scaleId={song.scaleId} capo={capo} onPickCapo={onCapoChange} />
             <div className="stage__display">
               <span className="field__label">Show chords as</span>
               <div className="segmented" role="group" aria-label="Chord display">

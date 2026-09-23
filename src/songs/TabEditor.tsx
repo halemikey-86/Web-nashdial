@@ -167,7 +167,17 @@ export function TabEditor({ block, stringLabels, capo = 0, onChange }: TabEditor
   const neckNotes = (s: TabStep | undefined) =>
     s && s !== `|` ? s.flatMap((c, row) => (c && typeof c.f === `number` ? [{ string: stringCount - 1 - row, fret: c.f + capo, text: cellText(c) }] : [])) : [];
   const nowNotes = neckNotes(current);
-  const prevNotes = neckNotes(steps[step - 1]);
+  // Every note in the tab, once per position, so the whole line shows on the neck.
+  const allNotes = new Map<string, { string: number; fret: number; text: string; order: number[] }>();
+  steps.forEach((s, i) => {
+    if (i === step) return;
+    for (const n of neckNotes(s)) {
+      const key = `${n.string}-${n.fret}`;
+      const hit = allNotes.get(key);
+      if (hit) hit.order.push(i + 1);
+      else allNotes.set(key, { ...n, order: [i + 1] });
+    }
+  });
 
   return (
     <div className="tab-editor">
@@ -293,7 +303,7 @@ export function TabEditor({ block, stringLabels, capo = 0, onChange }: TabEditor
       {showNeck && (
         <div className="tab-editor__neck">
           <div className="tab-editor__neck-bar">
-            <span className="field__label">Tap the neck to enter a note in column {step + 1}</span>
+            <span className="field__label">Whole tab shown · tap the neck to enter a note in column {step + 1} (highlighted)</span>
             <label className="ex-check">
               <input
                 type="checkbox"
@@ -307,8 +317,8 @@ export function TabEditor({ block, stringLabels, capo = 0, onChange }: TabEditor
             </label>
           </div>
           <Neck stringCount={stringCount} capo={capo} onPick={pickFromNeck} label="Tap a string and fret to add it to the tab">
-            {prevNotes.map((n) => (
-              <NeckMarker key={`p${n.string}-${n.fret}`} string={n.string} stringCount={stringCount} fret={n.fret} variant="ghost" capo={capo} />
+            {[...allNotes.values()].map((n) => (
+              <NeckMarker key={`a${n.string}-${n.fret}`} string={n.string} stringCount={stringCount} fret={n.fret} label={n.text} variant="dot" capo={capo} />
             ))}
             {nowNotes.map((n) => (
               <NeckMarker key={`n${n.string}-${n.fret}`} string={n.string} stringCount={stringCount} fret={n.fret} label={n.text} variant="press" capo={capo} />

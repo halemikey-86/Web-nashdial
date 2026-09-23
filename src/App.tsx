@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChordShapes } from './components/ChordShapes';
-import { Fretboard, type FretboardBoard, type FretboardView } from './components/Fretboard';
-import { CAGED, type CagedShape } from './music/chordShapes';
+import { CapoGuide } from './components/CapoGuide';
+import { Fretboard, type FretboardBoard, type FretboardLabels, type FretboardView } from './components/Fretboard';
+import { TheoryPanel } from './components/TheoryPanel';
+import { PIECE_ORDER, type PieceType } from './music/tetrisShapes';
 import { loadPref, savePref } from './songs/storage';
 import { WarmUp } from './warmup/WarmUp';
 import { KeyDial } from './components/KeyDial';
 import { CapoSelector, InstrumentSelector, NashvilleNumbers, ScaleSelector, TuningSelector, ViewTabs } from './components/Selectors';
 import { ThemeJack } from './components/ThemeJack';
-import { TransposeConversion } from './components/TransposeConversion';
 import { useMediaQuery } from './hooks/useMediaQuery';
-import { KEYS, noteIndex } from './music/notes';
+import { KEYS } from './music/notes';
 import { DEFAULT_SCALE_ID, getScale, shapeKeyLabel } from './music/scales';
-import { conversionSummary } from './music/transpose';
 import { DEFAULT_INSTRUMENT, DEFAULT_TUNING, defaultTuningFor, getTuning, tuningsFor, type InstrumentId } from './music/tunings';
 import { navigate, useRoute, type Route } from './router';
 import { SetlistEditor, SetlistList } from './songs/Setlists';
@@ -20,12 +20,13 @@ import { SongLibrary } from './songs/SongLibrary';
 import { SetPlay, SongView, type OpenInDial } from './songs/StageRoutes';
 import { getTheme, loadTheme, saveTheme } from './themes';
 
-type MainView = 'fretboard' | 'chords';
+type MainView = 'fretboard' | 'chords' | 'theory';
 type Mode = 'dial' | 'songs' | 'sets' | 'warmup';
 
 const VIEW_OPTIONS: { id: MainView; label: string }[] = [
   { id: `fretboard`, label: `Fretboard` },
   { id: `chords`, label: `Chords` },
+  { id: `theory`, label: `Theory` },
 ];
 
 const MODES: { id: Mode; label: string; icon: string; route: Route }[] = [
@@ -69,7 +70,6 @@ export function App() {
   const onStage = route.name === `song` || route.name === `set-play`;
 
   const [keyIndex, setKeyIndex] = useState(0);
-  const [transposeIndex, setTransposeIndex] = useState(0);
   const [scaleId, setScaleId] = useState(DEFAULT_SCALE_ID);
   const [instrument, setInstrument] = useState<InstrumentId>(DEFAULT_INSTRUMENT);
   const [tuningId, setTuningId] = useState(DEFAULT_TUNING.id);
@@ -77,7 +77,12 @@ export function App() {
   const [view, setView] = useState<MainView>(`fretboard`);
   const [fretView, setFretViewState] = useState<FretboardView>(() => loadPref<string>(`fret-view`, `blocks`) as FretboardView);
   const [board, setBoardState] = useState<FretboardBoard>(() => (loadPref<string>(`fret-board`, `grid`) === `neck` ? `neck` : `grid`));
-  const [visibleShapes, setVisibleShapes] = useState<Set<CagedShape>>(() => new Set(CAGED));
+  const [visiblePieces, setVisiblePieces] = useState<Set<PieceType>>(() => new Set(PIECE_ORDER));
+  const [labels, setLabelsState] = useState<FretboardLabels>(() => (loadPref<string>(`fret-labels`, `notes`) === `intervals` ? `intervals` : `notes`));
+  const setLabels = (l: FretboardLabels) => {
+    setLabelsState(l);
+    savePref(`fret-labels`, l);
+  };
   const setFretView = (v: FretboardView) => {
     setFretViewState(v);
     savePref(`fret-view`, v);
@@ -90,12 +95,11 @@ export function App() {
   const desktop = useMediaQuery(`(min-width: 960px)`);
 
   const theme = getTheme(themeId);
-  const transposing = transposeIndex !== keyIndex;
-  const root = KEYS[transposeIndex].root;
+  const root = KEYS[keyIndex].root;
   const tunings = useMemo(() => tuningsFor(instrument), [instrument]);
   const tuning = useMemo(() => tunings.find((t) => t.id === tuningId) ?? defaultTuningFor(instrument), [tunings, tuningId, instrument]);
   const scale = getScale(scaleId);
-  const shapeKey = capo > 0 ? shapeKeyLabel(transposeIndex, scaleId, capo) : null;
+  const shapeKey = capo > 0 ? shapeKeyLabel(keyIndex, scaleId, capo) : null;
 
   const pickInstrument = (id: InstrumentId) => {
     setInstrument(id);
@@ -110,8 +114,7 @@ export function App() {
   // Load a song's key, scale, tuning and capo onto the dials/fretboard.
   const openInDial: OpenInDial = (song, playKey, songCapo) => {
     const t = getTuning(song.tuningId);
-    setKeyIndex(noteIndex(song.key));
-    setTransposeIndex(playKey);
+    setKeyIndex(playKey);
     setScaleId(song.scaleId);
     setInstrument(t.instrument);
     setTuningId(t.id);
@@ -119,22 +122,11 @@ export function App() {
     navigate({ name: `dial` });
   };
 
-  const transposeBlock = (
-    <div className="app__transpose-block">
-      <div className="app__dial-transpose">
-        <p className="app__dial-label">Transpose to</p>
-        <KeyDial selectedIndex={transposeIndex} onChange={setTransposeIndex} variant="transpose" />
-        <TransposeConversion fromKeyIndex={keyIndex} toKeyIndex={transposeIndex} scaleId={scaleId} />
-      </div>
-      <ScaleSelector scaleId={scaleId} onChange={setScaleId} />
-    </div>
-  );
-
   const dialScreen = (
     <>
       <div className="amp__brand">
         <span className="amp__brand-detail">
-          {transposing ? conversionSummary(keyIndex, transposeIndex, scaleId) : `${KEYS[keyIndex].label} ${scale.shortName}`}
+          {KEYS[keyIndex].label} {scale.shortName}
           {capo > 0 && ` · Capo ${capo}`}
         </span>
         {shapeKey && <span className="amp__brand-shape-key">Think in {shapeKey} shapes</span>}
@@ -142,19 +134,19 @@ export function App() {
       <main className={`app__main${desktop ? ` app__main--desktop` : ``}`}>
         <section className="app__col-dial">
           <div className="app__dial-primary">
-            <p className="app__dial-label">Original key</p>
+            <p className="app__dial-label">Key</p>
             <KeyDial selectedIndex={keyIndex} scaleId={scaleId} onChange={setKeyIndex} variant="primary" />
           </div>
-          {!desktop && <div className="app__dials-row">{transposeBlock}</div>}
         </section>
         <section className="app__col-controls">
           <InstrumentSelector instrumentId={instrument} onChange={pickInstrument} />
           <NashvilleNumbers root={root} scaleId={scaleId} />
           <div className="app__controls-row">
+            <ScaleSelector scaleId={scaleId} onChange={setScaleId} />
             <TuningSelector selectedId={tuning.id} tunings={tunings} onChange={setTuningId} />
-            <CapoSelector capoFret={capo} onChange={setCapo} />
           </div>
-          {desktop && transposeBlock}
+          <CapoSelector capoFret={capo} onChange={setCapo} />
+          <CapoGuide keyIndex={keyIndex} scaleId={scaleId} capo={capo} onPickCapo={setCapo} />
         </section>
         <section className="app__col-view">
           <ViewTabs view={view} onChange={setView} options={VIEW_OPTIONS} label="Main view" />
@@ -169,13 +161,17 @@ export function App() {
                 onViewChange={setFretView}
                 board={board}
                 onBoardChange={setBoard}
-                visibleShapes={visibleShapes}
-                onVisibleShapesChange={setVisibleShapes}
+                labels={labels}
+                onLabelsChange={setLabels}
+                visiblePieces={visiblePieces}
+                onVisiblePiecesChange={setVisiblePieces}
                 fretCount={24}
                 compact={desktop}
               />
-            ) : (
+            ) : view === `chords` ? (
               <ChordShapes root={root} scaleId={scaleId} tuning={tuning} capoFret={capo} />
+            ) : (
+              <TheoryPanel keyIndex={keyIndex} scaleId={scaleId} capo={capo} onPickCapo={setCapo} />
             )}
           </div>
         </section>

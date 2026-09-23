@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { pluck, strum, usePlayback } from '../audio';
+import { ChordNeck } from '../components/ChordNeck';
 import { Neck, NeckMarker } from '../components/Neck';
-import { NECK_FRETS } from '../components/neckGeometry';
+import { fretCount, neckFor } from '../components/neckGeometry';
 import { SHAPE_COLORS } from '../music/cagedPositions';
 import { CAGED, resolveShape, type CagedShape, type ResolvedShape } from '../music/chordShapes';
 import { noteAt } from '../music/notes';
@@ -159,7 +160,7 @@ function TabPlayer({
   const all = columns.flatMap((c) => notes(c.col).map((n) => n.fret));
   const lowest = Math.min(...(all.length ? all : [capo]));
   const from = capo > 0 ? capo : Math.max(0, lowest - 1);
-  const to = Math.min(NECK_FRETS, Math.max(from + 5, ...(all.length ? all.map((f) => f + 1) : [from + 5])));
+  const to = Math.min(fretCount(neckFor(count)), Math.max(from + 5, ...(all.length ? all.map((f) => f + 1) : [from + 5])));
 
   useEffect(() => {
     if (settings.sound) now.forEach((n) => pluck(midi[n.string] + n.fret, 0, 0.2));
@@ -255,8 +256,6 @@ function ChordPlayer({
 
   if (count !== 6) return <p className="list-empty card">Chord shapes on the neck are for 6-string guitar tunings.</p>;
   const base = shape?.baseFret ?? 0;
-  const from = capo > 0 ? capo : Math.max(0, base - 1);
-  const to = Math.min(NECK_FRETS, Math.max(from + 5, base + 4));
 
   return (
     <>
@@ -268,19 +267,7 @@ function ChordPlayer({
           </span>
         )}
       </div>
-      <div className="live__neck">
-        <Neck stringCount={count} fromFret={from} toFret={to} capo={capo} vibrating={new Set(shape?.fingers.map((f) => f.stringIndex))} label="Chord shape on the neck">
-          {shape?.strings.map((s) =>
-            s.fret === null ? (
-              <NeckMarker key={s.stringIndex} string={s.stringIndex} stringCount={count} fret={from} variant="mute" />
-            ) : s.fret === 0 || s.fret === capo ? (
-              <NeckMarker key={s.stringIndex} string={s.stringIndex} stringCount={count} fret={s.fret} variant="open" root={s.isRoot} capo={capo} />
-            ) : (
-              <NeckMarker key={s.stringIndex} string={s.stringIndex} stringCount={count} fret={s.fret} label={String(s.fret)} variant="press" root={s.isRoot} />
-            ),
-          )}
-        </Neck>
-      </div>
+      <div className="live__neck live__neck--chord">{shape && <ChordNeck key={index} resolved={shape} stringCount={count} capo={capo} ringing />}</div>
       <div className="shape-chips live__shapes" role="group" aria-label="Chord shape">
         {CAGED.map((sh) => {
           const ok = chord ? !!resolveShape(sh, chord.root, chord.quality, tuning, capo) : false;
