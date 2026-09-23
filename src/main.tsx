@@ -9,6 +9,8 @@ import './styles/songs.css';
 import './styles/neck.css';
 import './styles/drums.css';
 import './styles/tuner.css';
+import './styles/live.css';
+import './styles/theme-fixes.css';
 
 document.documentElement.dataset.theme = loadTheme();
 

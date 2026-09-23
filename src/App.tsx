@@ -8,6 +8,7 @@ import { loadPref, savePref } from './songs/storage';
 import { WarmUp } from './warmup/WarmUp';
 import { DrumsHome, DrumsticksIcon } from './songs/DrumView';
 import { Tuner, TuningForkIcon } from './tuner/Tuner';
+import { SharedImport } from './songs/SharedImport';
 import { KeyDial } from './components/KeyDial';
 import { CapoSelector, InstrumentSelector, NashvilleNumbers, ScaleSelector, TuningSelector, ViewTabs } from './components/Selectors';
 import { ThemeJack } from './components/ThemeJack';
@@ -45,6 +46,7 @@ function modeOf(route: Route): Mode {
   if (route.name === `warmup`) return `warmup`;
   if (route.name === `drums`) return `drums`;
   if (route.name === `tuner`) return `tuner`;
+  if (route.name === `share`) return `songs`;
   if (route.name.startsWith(`song`)) return `songs`;
   return `sets`;
 }
@@ -216,6 +218,9 @@ export function App() {
       break;
     case `tuner`:
       content = <Tuner />;
+      break;
+    case `share`:
+      content = <SharedImport code={route.code} />;
       break;
   }
 

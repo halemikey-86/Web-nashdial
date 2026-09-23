@@ -1010,3 +1010,69 @@ text.neck-marker--mute {
 [data-theme='orange'] .picker__row:has(input:checked) {
   color: #fff;
 }
+
+/* ---------- Shapes: Scale / Triads source and triad picker ---------- */
+
+.shape-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.shape-source__toggle {
+  flex-shrink: 0;
+}
+.triad-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.triad-picker__chords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.triad-picker__chord {
+  min-height: 32px;
+  padding: 3px 9px;
+}
+.triad-picker__degree {
+  color: var(--theme-accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+.triad-picker__chord--on {
+  background: var(--theme-tab-active);
+  color: var(--theme-on-active);
+  box-shadow: 0 0 0 2px var(--theme-accent);
+}
+.triad-picker__chord--on .triad-picker__degree {
+  color: inherit;
+}
+.triad-picker__custom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.triad-picker__custom .input {
+  width: auto;
+}
+.shape-source__hint {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--theme-text-muted);
+  font-size: 0.72rem;
+}
+
+.triad-filters__divider {
+  width: 1px;
+  height: 26px;
+  margin: 0 2px;
+  background: var(--theme-control-border);
+}
+.shape-chip--set {
+  padding-left: 10px;
+  font-family: var(--sheet-mono);
+}

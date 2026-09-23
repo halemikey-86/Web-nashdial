@@ -1,0 +1,184 @@
+/* ==========================================================================
+   Theme readability.
+
+   The original styles hard-coded dark text for the gold "Marshall" panel, which
+   disappears on the dark Avacado (mesa) and Sox (vox) panels. Everything here maps
+   text, buttons and controls onto each theme's palette. Loaded last on purpose.
+   ========================================================================== */
+
+/* Text colour on the "active" (selected) background of each theme. */
+:root,
+[data-theme='marshall'] {
+  --theme-on-active: #111;
+  --theme-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23111' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+}
+[data-theme='orange'] {
+  --theme-on-active: #fff;
+}
+[data-theme='mesa'] {
+  --theme-on-active: #fff;
+  --theme-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23e8e8e8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+}
+[data-theme='vox'] {
+  --theme-on-active: #1a1408;
+  --theme-select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f5f0e0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+}
+
+/* Everything drawn on the active background uses the matching text colour. */
+.instrument-selector__btn--active,
+.view-tabs__btn--active,
+.fretboard-view-toggle__btn--active,
+.chord-shapes__degree-btn--active,
+.chord-shapes__shape-btn--active,
+.live__section--now,
+.live__chord--now,
+.capo-guide__option--on,
+.btn--primary,
+.segmented__btn--active,
+.tab-editor__cell--active,
+.tab-key:active,
+.tab-key--on,
+.sheet__chip--key,
+.stage__key-btn--open,
+[data-theme] .instrument-selector__btn--active,
+[data-theme] .view-tabs__btn--active {
+  color: var(--theme-on-active);
+}
+.chord-shapes__degree-btn--active .chord-shapes__degree-num,
+.chord-shapes__degree-btn--active .chord-shapes__degree-label,
+.btn--primary * {
+  color: inherit;
+}
+
+/* Board / label / display toggles (Grid · Guitar, Notes · 1-2-3, Blocks · Dots · Shapes). */
+.fretboard-view-toggle {
+  border-color: var(--theme-control-border);
+  background: var(--theme-control-bg);
+  box-shadow: inset 0 2px 5px var(--theme-control-shadow);
+}
+.fretboard-view-toggle__btn {
+  color: var(--theme-text-muted);
+}
+.fretboard-view-toggle__btn--active {
+  background: var(--theme-tab-active);
+}
+
+/* Main view tabs (Fretboard · Chords · Theory) and instrument buttons. */
+.view-tabs__btn,
+.view-tabs__btn--active {
+  border-color: var(--theme-control-border);
+}
+
+/* Chords tab: degree and CAGED shape pickers, legend. */
+.chord-shapes__degree-btn,
+.chord-shapes__shape-btn {
+  border-color: var(--theme-control-border);
+  background: var(--theme-control-bg);
+  color: var(--theme-text-muted);
+}
+.chord-shapes__degree-btn--active,
+.chord-shapes__shape-btn--active {
+  border-color: color-mix(in srgb, var(--theme-text) 30%, transparent);
+  background: var(--theme-tab-active);
+}
+.chord-shapes__legend {
+  border-color: var(--theme-control-border);
+  background: var(--theme-control-bg);
+}
+.chord-shapes__legend-title,
+.chord-shapes__legend-note,
+.chord-shapes__legend-mute,
+.chord-shapes__unavailable {
+  color: var(--theme-text-muted);
+}
+.chord-shapes__legend-list li,
+.chord-shapes__legend-note strong,
+.chord-shapes__legend-open {
+  color: var(--theme-text);
+}
+.chord-shapes__legend-dot {
+  background: var(--theme-text);
+}
+
+/* Nashville number cells. */
+.nashville__cell {
+  border-color: var(--theme-control-border);
+  background: var(--theme-control-bg);
+}
+.nashville__cell--aug .nashville__chord {
+  color: var(--theme-text-muted);
+}
+
+/* Capo hint and fret markers. */
+.capo-selector__hint {
+  color: var(--theme-text-muted);
+}
+.fretboard__marker-dot {
+  background: var(--theme-text-muted);
+}
+
+/* Dropdown arrows follow the theme text colour. */
+.capo-selector__select,
+.scale-selector__select,
+.tuning-selector__select {
+  background-image: var(--theme-select-arrow);
+}
+
+/* Inputs, selects and buttons in the newer screens. */
+.input,
+select.input,
+.chip-btn,
+.btn,
+.segmented__btn,
+.tab-key,
+.shape-chip,
+.ex-card,
+.list-row__main,
+.set-item__title,
+.picker__row {
+  color: var(--theme-text);
+}
+.segmented__btn:not(.segmented__btn--active),
+.btn--ghost {
+  color: var(--theme-text);
+}
+.segmented__btn:not(.segmented__btn--active) {
+  opacity: 0.85;
+}
+.btn--danger {
+  color: var(--theme-accent);
+}
+
+/* Sox's accent is gold, which is low-contrast as text on its gold-trimmed cards. */
+[data-theme='vox'] .btn--danger,
+[data-theme='vox'] .tab-key--danger,
+[data-theme='vox'] .tab-key--muted {
+  color: #ff8a7a;
+}
+
+/* Orange's accent (bright orange) needs dark text inside it. */
+[data-theme='orange'] .tab-display__now,
+[data-theme='orange'] .drums__fill {
+  color: #111;
+}
+
+/* Unselected tabs and toggles: full text colour, slightly softened, so they read on dark panels. */
+.view-tabs__btn:not(.view-tabs__btn--active),
+.fretboard-view-toggle__btn:not(.fretboard-view-toggle__btn--active),
+.instrument-selector__btn:not(.instrument-selector__btn--active),
+.chord-shapes__degree-btn:not(.chord-shapes__degree-btn--active),
+.chord-shapes__shape-btn:not(.chord-shapes__shape-btn--active) {
+  color: color-mix(in srgb, var(--theme-text) 78%, transparent);
+}
+
+/* Nashville diminished / augmented chords were translucent black. */
+.nashville__cell--dim .nashville__chord,
+.nashville__cell--aug .nashville__chord {
+  color: var(--theme-text-muted);
+}
+
+/* The dial's centre sits on a light metal knob in every theme: keep its label dark. */
+[data-theme='mesa'] .key-dial__center-label,
+[data-theme='vox'] .key-dial__center-label {
+  color: #111;
+}

@@ -3,6 +3,7 @@ import { Field, PageHeader, useToast } from '../components/ui';
 import { CAPO_FRETS, KEYS, capoLabel, type NoteName } from '../music/notes';
 import { navigate } from '../router';
 import { fileSlug, saveJsonFile, setlistFile } from './io';
+import { shareFile } from './share';
 import { useLibrary } from './library';
 import { createSetlist, songDisplayName } from './model';
 import { useImport } from './useImport';
@@ -168,6 +169,16 @@ export function SetlistEditor({ setlistId }: { setlistId: string }) {
   return (
     <div className="page setlist-editor">
       <PageHeader title={setlist.name || `Setlist`} onBack={() => navigate({ name: `sets` })} backLabel="Setlists">
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={async () => {
+            const r = await shareFile(setlistFile(setlist, library.songs), setlist.name || `Setlist`);
+            if (r === `copied`) toast(`Share link copied — send it to your band`);
+          }}
+        >
+          Share
+        </button>
         <button type="button" className="btn btn--ghost" onClick={() => saveJsonFile(`${fileSlug(setlist.name, setlist.date)}.nashdial-setlist.json`, setlistFile(setlist, library.songs))}>
           Export
         </button>

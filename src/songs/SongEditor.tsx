@@ -11,6 +11,7 @@ import { navigate } from '../router';
 import { useLibrary } from './library';
 import { TIME_SIGNATURES, createSection, createSong, createTabBlock, emptyColumn, newId, nextSectionLabel, sectionBars, songDisplayName } from './model';
 import { fileSlug, saveJsonFile, songFile } from './io';
+import { shareFile } from './share';
 import { SongSheet } from './SongSheet';
 import { TabEditor } from './TabEditor';
 import { stringLabels } from './tabStrings';
@@ -115,10 +116,11 @@ interface SectionEditorProps {
   /** Press on the header (or grip) to start dragging this section. */
   onDragStart: (e: ReactPointerEvent<HTMLDivElement>) => void;
   dragging: boolean;
+  open: boolean;
+  onToggle: () => void;
 }
 
-function SectionEditor({ section, song, index, count, onChange, onMove, onDuplicate, onDelete, onDragStart, dragging }: SectionEditorProps) {
-  const [open, setOpen] = useState(true);
+function SectionEditor({ section, song, index, count, onChange, onMove, onDuplicate, onDelete, onDragStart, dragging, open, onToggle }: SectionEditorProps) {
   const chordsRef = useRef<HTMLTextAreaElement>(null);
   const tuning = getTuning(song.tuningId);
   const labels = stringLabels(tuning);
@@ -134,7 +136,7 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
         <button
           type="button"
           className="section-editor__toggle"
-          onClick={() => setOpen((o) => !o)}
+          onClick={onToggle}
           aria-expanded={open}
           aria-label={open ? `Collapse section` : `Expand section`}
         >
@@ -292,6 +294,23 @@ export function SongEditor({ songId }: { songId: string | null }) {
   const [dirty, setDirty] = useState(!stored);
   const [preview, setPreview] = useState(false);
   const [customName, setCustomName] = useState(``);
+  /** Sections folded down to their header. New songs and imports start with everything open. */
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const toggleSection = (id: string) =>
+    setCollapsed((c) => {
+      const n = new Set(c);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  /** Add a section and fold the others so the new one is easy to fill in. */
+  const addSection = (section: Section) => {
+    setCollapsed(new Set(draft.sections.map((x) => x.id)));
+    setSections([...draft.sections, section]);
+    requestAnimationFrame(() =>
+      listRef.current?.querySelector(`[data-section-id="${section.id}"]`)?.scrollIntoView({ block: `center`, behavior: `smooth` }),
+    );
+  };
   const listRef = useRef<HTMLDivElement>(null);
   /** The section being dragged, where it would drop (index among the others), and the pointer's y. */
   const [drag, setDrag] = useState<{ id: string; target: number; y: number } | null>(null);
@@ -558,6 +577,26 @@ export function SongEditor({ songId }: { songId: string | null }) {
         </Field>
       </fieldset>
 
+      {draft.sections.length > 0 ? (
+        <div className="song-editor__sections-bar">
+          <span className="field__label">
+            {draft.sections.length} section{draft.sections.length === 1 ? `` : `s`}
+          </span>
+          <label className="ex-check">
+            <input
+              type="checkbox"
+              checked={draft.sections.every((x) => collapsed.has(x.id))}
+              onChange={(e) => setCollapsed(e.target.checked ? new Set(draft.sections.map((x) => x.id)) : new Set())}
+            />
+            {draft.sections.every((x) => collapsed.has(x.id)) ? `Collapsed — uncheck to expand all` : `Collapse all`}
+          </label>
+        </div>
+      ) : (
+        <div className="card song-editor__empty">
+          <p className="empty__title">Build your song's structure</p>
+          <p>Add sections in the order you play them — Intro, Verse, Chorus… or name your own. You can drag them around later.</p>
+        </div>
+      )}
       <div className="song-editor__sections" ref={listRef}>
         {draft.sections.map((section, i) => (
           <div key={section.id} className="song-editor__slot">
@@ -565,6 +604,8 @@ export function SongEditor({ songId }: { songId: string | null }) {
             <SectionEditor
           dragging={drag?.id === section.id}
           onDragStart={(e) => pressSection(section.id, e)}
+          open={!collapsed.has(section.id)}
+          onToggle={() => toggleSection(section.id)}
           section={section}
           song={draft}
           index={i}
@@ -595,7 +636,7 @@ export function SongEditor({ songId }: { songId: string | null }) {
               key={t.id}
               type="button"
               className="chip-btn"
-              onClick={() => setSections([...draft.sections, createSection(t.id, nextSectionLabel(draft.sections, t.id))])}
+              onClick={() => addSection(createSection(t.id, nextSectionLabel(draft.sections, t.id)))}
             >
               + {t.label}
             </button>
@@ -607,7 +648,7 @@ export function SongEditor({ songId }: { songId: string | null }) {
             e.preventDefault();
             const name = customName.trim();
             if (!name) return;
-            setSections([...draft.sections, createSection(`custom`, name)]);
+            addSection(createSection(`custom`, name));
             setCustomName(``);
           }}
         >
@@ -632,6 +673,18 @@ export function SongEditor({ songId }: { songId: string | null }) {
         {!sideBySide && (
           <button type="button" className="btn btn--ghost" onClick={() => setPreview((p) => !p)}>
             {preview ? `Edit` : `Preview`}
+          </button>
+        )}
+        {stored && (
+          <button
+            type="button"
+            className="btn btn--ghost"
+            onClick={async () => {
+              const r = await shareFile(songFile(draft), songDisplayName(draft));
+              if (r === `copied`) toast(`Share link copied — paste it in a message`);
+            }}
+          >
+            Share
           </button>
         )}
         {stored && (

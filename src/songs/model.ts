@@ -93,7 +93,7 @@ export function createSong(): Song {
     bpm: null,
     timeSignature: `4/4`,
     notes: ``,
-    sections: [createSection(`intro`, `Intro`), createSection(`verse`, `Verse`), createSection(`chorus`, `Chorus`)],
+    sections: [],
     createdAt: t,
     updatedAt: t,
   };
