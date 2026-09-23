@@ -1,0 +1,24 @@
+{
+  "name": "NashDial",
+  "short_name": "NashDial",
+  "description": "Circle of fifths key dial with Nashville numbers for guitar and music theory",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#4a3808",
+  "theme_color": "#f0c040",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
