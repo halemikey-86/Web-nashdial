@@ -7,6 +7,7 @@ export const SECTION_TYPES = [
   { id: `verse`, label: `Verse` },
   { id: `prechorus`, label: `Prechorus` },
   { id: `chorus`, label: `Chorus` },
+  { id: `refrain`, label: `Refrain` },
   { id: `bridge`, label: `Bridge` },
   { id: `vamp`, label: `Vamp` },
   { id: `epic-chorus`, label: `Epic Chorus` },

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChordShapes } from './components/ChordShapes';
-import { Fretboard, type FretboardView } from './components/Fretboard';
+import { Fretboard, type FretboardBoard, type FretboardView } from './components/Fretboard';
+import { CAGED, type CagedShape } from './music/chordShapes';
+import { loadPref, savePref } from './songs/storage';
+import { WarmUp } from './warmup/WarmUp';
 import { KeyDial } from './components/KeyDial';
 import { CapoSelector, InstrumentSelector, NashvilleNumbers, ScaleSelector, TuningSelector, ViewTabs } from './components/Selectors';
 import { ThemeJack } from './components/ThemeJack';
@@ -18,7 +21,7 @@ import { SetPlay, SongView, type OpenInDial } from './songs/StageRoutes';
 import { getTheme, loadTheme, saveTheme } from './themes';
 
 type MainView = 'fretboard' | 'chords';
-type Mode = 'dial' | 'songs' | 'sets';
+type Mode = 'dial' | 'songs' | 'sets' | 'warmup';
 
 const VIEW_OPTIONS: { id: MainView; label: string }[] = [
   { id: `fretboard`, label: `Fretboard` },
@@ -29,10 +32,12 @@ const MODES: { id: Mode; label: string; icon: string; route: Route }[] = [
   { id: `dial`, label: `Dial`, icon: `◎`, route: { name: `dial` } },
   { id: `songs`, label: `Songs`, icon: `♫`, route: { name: `songs` } },
   { id: `sets`, label: `Setlists`, icon: `☰`, route: { name: `sets` } },
+  { id: `warmup`, label: `Warm-up`, icon: `✋︎`, route: { name: `warmup`, id: null } },
 ];
 
 function modeOf(route: Route): Mode {
   if (route.name === `dial`) return `dial`;
+  if (route.name === `warmup`) return `warmup`;
   if (route.name.startsWith(`song`)) return `songs`;
   return `sets`;
 }
@@ -70,7 +75,17 @@ export function App() {
   const [tuningId, setTuningId] = useState(DEFAULT_TUNING.id);
   const [capo, setCapo] = useState(0);
   const [view, setView] = useState<MainView>(`fretboard`);
-  const [fretView, setFretView] = useState<FretboardView>(`blocks`);
+  const [fretView, setFretViewState] = useState<FretboardView>(() => loadPref<string>(`fret-view`, `blocks`) as FretboardView);
+  const [board, setBoardState] = useState<FretboardBoard>(() => (loadPref<string>(`fret-board`, `grid`) === `neck` ? `neck` : `grid`));
+  const [visibleShapes, setVisibleShapes] = useState<Set<CagedShape>>(() => new Set(CAGED));
+  const setFretView = (v: FretboardView) => {
+    setFretViewState(v);
+    savePref(`fret-view`, v);
+  };
+  const setBoard = (b: FretboardBoard) => {
+    setBoardState(b);
+    savePref(`fret-board`, b);
+  };
   const [themeId, setThemeId] = useState(loadTheme);
   const desktop = useMediaQuery(`(min-width: 960px)`);
 
@@ -145,7 +160,20 @@ export function App() {
           <ViewTabs view={view} onChange={setView} options={VIEW_OPTIONS} label="Main view" />
           <div className="app__tab-panel" role="tabpanel">
             {view === `fretboard` ? (
-              <Fretboard tuning={tuning} root={root} scaleId={scaleId} capoFret={capo} view={fretView} onViewChange={setFretView} fretCount={24} compact={desktop} />
+              <Fretboard
+                tuning={tuning}
+                root={root}
+                scaleId={scaleId}
+                capoFret={capo}
+                view={fretView}
+                onViewChange={setFretView}
+                board={board}
+                onBoardChange={setBoard}
+                visibleShapes={visibleShapes}
+                onVisibleShapesChange={setVisibleShapes}
+                fretCount={24}
+                compact={desktop}
+              />
             ) : (
               <ChordShapes root={root} scaleId={scaleId} tuning={tuning} capoFret={capo} />
             )}
@@ -177,6 +205,9 @@ export function App() {
       break;
     case `set-play`:
       content = <SetPlay setlistId={route.id} index={route.index} onOpenInDial={openInDial} />;
+      break;
+    case `warmup`:
+      content = <WarmUp exerciseId={route.id} />;
       break;
   }
 

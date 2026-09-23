@@ -6,7 +6,7 @@ export type CagedShape = 'C' | 'A' | 'G' | 'E' | 'D';
 
 export const CAGED: CagedShape[] = [`C`, `A`, `G`, `E`, `D`];
 
-interface ShapeTemplate {
+export interface ShapeTemplate {
   rootString: number;
   rootFret: number;
   frets: (number | null)[];
@@ -46,7 +46,7 @@ function findFret(tuning: Tuning, stringIndex: number, note: string, from = 0, t
   return null;
 }
 
-function templateFor(shape: CagedShape, quality: ChordQuality): ShapeTemplate | null {
+export function templateFor(shape: CagedShape, quality: ChordQuality): ShapeTemplate | null {
   if (quality === `dim` || quality === `aug`) return null;
   return quality === `major` ? MAJOR_SHAPES[shape] : MINOR_SHAPES[shape];
 }

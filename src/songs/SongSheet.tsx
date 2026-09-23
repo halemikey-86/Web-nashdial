@@ -10,10 +10,12 @@ interface SongSheetProps {
   ctx: TransposeContext;
   /** Show the sheet header (title, artist, key). */
   header?: boolean;
+  /** Only the header, no sections. */
+  headerOnly?: boolean;
 }
 
 /** Read-only, performance-friendly rendering of a song in the chosen key. */
-export function SongSheet({ song, ctx, header = true }: SongSheetProps) {
+export function SongSheet({ song, ctx, header = true, headerOnly = false }: SongSheetProps) {
   const tuning = getTuning(song.tuningId);
   const labels = stringLabels(tuning);
   const scaleName = getScale(song.scaleId).shortName;
@@ -50,8 +52,8 @@ export function SongSheet({ song, ctx, header = true }: SongSheetProps) {
           {song.notes.trim() && <p className="sheet__notes">{song.notes}</p>}
         </header>
       )}
-      {sections.length === 0 && <p className="sheet__empty">Nothing tabbed yet — edit the song to add chords, tabs and notes.</p>}
-      <div className="sheet__sections">
+      {!headerOnly && sections.length === 0 && <p className="sheet__empty">Nothing tabbed yet — edit the song to add chords, tabs and notes.</p>}
+      {!headerOnly && <div className="sheet__sections">
         {sections.map((section) => (
           <section key={section.id} className={`sheet-section sheet-section--${section.type}`}>
             <h3 className="sheet-section__label">{section.label}</h3>
@@ -75,7 +77,7 @@ export function SongSheet({ song, ctx, header = true }: SongSheetProps) {
             {section.notes.trim() && <p className="sheet-section__notes">{section.notes}</p>}
           </section>
         ))}
-      </div>
+      </div>}
     </article>
   );
 }

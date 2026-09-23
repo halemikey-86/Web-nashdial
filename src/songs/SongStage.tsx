@@ -5,6 +5,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { noteIndex } from '../music/notes';
 import { describeInterval, intervalBetween } from '../music/transpose';
 import { loadPref, savePref } from './storage';
+import { LiveView } from './LiveView';
 import { SongSheet } from './SongSheet';
 import { prefersFlats, spellNote, type ChordDisplay, type TransposeContext } from './songTranspose';
 import type { Song } from './types';
@@ -89,6 +90,11 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
   const [display, setDisplay] = useState<ChordDisplay>(() => loadPref<string>(`chord-display`, `sounding`) as ChordDisplay);
   const [fontScale, setFontScale] = useState(() => loadPref<number>(`sheet-scale`, 1));
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [stageView, setStageView] = useState<'sheet' | 'live'>(() => (loadPref<string>(`stage-view`, `sheet`) === `live` ? `live` : `sheet`));
+  const pickStageView = (v: 'sheet' | 'live') => {
+    setStageView(v);
+    savePref(`stage-view`, v);
+  };
   const desktop = useMediaQuery(`(min-width: 960px)`);
   const sheetRef = useRef<HTMLDivElement>(null);
   const songKey = noteIndex(song.key);
@@ -144,7 +150,7 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
   // Horizontal swipe on the sheet changes songs.
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
   const onPointerDown = (e: ReactPointerEvent) => {
-    if (e.pointerType !== `touch` || (e.target as HTMLElement).closest(`.tab-display`)) return;
+    if (e.pointerType !== `touch` || (e.target as HTMLElement).closest(`.tab-display, .live`)) return;
     swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
   };
   const onPointerUp = (e: ReactPointerEvent) => {
@@ -177,6 +183,14 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
               {nav.index + 1} / {nav.count}
             </span>
           )}
+        </div>
+        <div className="segmented stage__view" role="tablist" aria-label="Song view">
+          <button type="button" role="tab" aria-selected={stageView === `sheet`} className={`segmented__btn${stageView === `sheet` ? ` segmented__btn--active` : ``}`} onClick={() => pickStageView(`sheet`)}>
+            Sheet
+          </button>
+          <button type="button" role="tab" aria-selected={stageView === `live`} className={`segmented__btn${stageView === `live` ? ` segmented__btn--active` : ``}`} onClick={() => pickStageView(`live`)}>
+            Live
+          </button>
         </div>
         {!desktop && (
           <button type="button" className={`btn stage__key-btn${controlsOpen ? ` stage__key-btn--open` : ``}`} onClick={() => setControlsOpen((o) => !o)} aria-expanded={controlsOpen}>
@@ -248,7 +262,14 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
           onPointerUp={onPointerUp}
           onPointerCancel={() => (swipe.current = null)}
         >
-          <SongSheet song={song} ctx={ctx} />
+          {stageView === `live` ? (
+            <>
+              <SongSheet song={song} ctx={ctx} headerOnly />
+              <LiveView key={song.id} song={song} ctx={ctx} />
+            </>
+          ) : (
+            <SongSheet song={song} ctx={ctx} />
+          )}
         </div>
       </div>
 

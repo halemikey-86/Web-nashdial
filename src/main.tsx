@@ -6,6 +6,7 @@ import { LibraryProvider } from './songs/library';
 import { loadTheme } from './themes';
 import './styles/app.css';
 import './styles/songs.css';
+import './styles/neck.css';
 
 document.documentElement.dataset.theme = loadTheme();
 

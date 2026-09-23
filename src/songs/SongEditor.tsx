@@ -4,7 +4,9 @@ import { ScaleSelector } from '../components/Selectors';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { KEYS, CAPO_FRETS, capoLabel, noteIndex, type NoteName } from '../music/notes';
 import { diatonicChords } from '../music/scales';
-import { INSTRUMENTS, TUNINGS, getTuning } from '../music/tunings';
+import { INSTRUMENTS, TUNINGS, getTuning, midiName, openStringMidi, type Tuning } from '../music/tunings';
+import { Neck, NeckMarker } from '../components/Neck';
+import { loadPref, savePref } from './storage';
 import { navigate } from '../router';
 import { useLibrary } from './library';
 import { createSection, createSong, createTabBlock, emptyColumn, newId, nextSectionLabel, songDisplayName } from './model';
@@ -39,6 +41,66 @@ function insertAtCursor(el: HTMLTextAreaElement | null, value: string, text: str
     el.focus();
     el.setSelectionRange(pos, pos);
   });
+}
+
+/** Fretboard for entering single notes: each tap appends the note (with octave) to the line. */
+function NotePicker({ tuning, capo, value, onChange }: { tuning: Tuning; capo: number; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(() => loadPref<string>(`notes-neck`, `on`) === `on`);
+  const [taps, setTaps] = useState<{ string: number; fret: number }[]>([]);
+  const midi = openStringMidi(tuning);
+  const count = tuning.strings.length;
+
+  const toggle = () => {
+    setOpen((o) => !o);
+    savePref(`notes-neck`, open ? `off` : `on`);
+  };
+  const pick = (string: number, fret: number) => {
+    if (fret < capo) return;
+    const name = midiName(midi[string] + fret);
+    const trimmed = value.replace(/\s+$/, ``);
+    onChange(trimmed ? `${trimmed} ${name}` : name);
+    setTaps((t) => [...t.slice(-11), { string, fret }]);
+  };
+  const undo = () => {
+    const tokens = value.trim().split(/\s+/);
+    tokens.pop();
+    onChange(tokens.join(` `));
+    setTaps((t) => t.slice(0, -1));
+  };
+
+  return (
+    <div className="note-picker">
+      <div className="note-picker__bar">
+        <button type="button" className="btn btn--small" onClick={toggle} aria-expanded={open}>
+          {open ? `Hide fretboard` : `Pick notes on the fretboard`}
+        </button>
+        {open && (
+          <>
+            <button type="button" className="btn btn--small" onClick={() => onChange(`${value.replace(/\s+$/, ``)} |`)} disabled={!value.trim()}>
+              + Bar |
+            </button>
+            <button type="button" className="btn btn--small btn--danger" onClick={undo} disabled={!value.trim()}>
+              ⌫ Last note
+            </button>
+          </>
+        )}
+      </div>
+      {open && (
+        <Neck stringCount={count} capo={capo} onPick={pick} label="Tap a string and fret to add that note">
+          {taps.map((t, i) => (
+            <NeckMarker
+              key={`${i}-${t.string}-${t.fret}`}
+              string={t.string}
+              stringCount={count}
+              fret={t.fret}
+              label={midiName(midi[t.string] + t.fret).replace(/-?\d+$/, ``)}
+              variant={i === taps.length - 1 ? `press` : `ghost`}
+            />
+          ))}
+        </Neck>
+      )}
+    </div>
+  );
 }
 
 interface SectionEditorProps {
@@ -147,6 +209,7 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
                 <TabEditor
                   block={tab}
                   stringLabels={labels}
+                  capo={song.capo}
                   onChange={(b) => set(`tabs`, section.tabs.map((t, i) => (i === ti ? b : t)))}
                 />
               </div>
@@ -168,6 +231,7 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
               autoCapitalize="characters"
               autoCorrect="off"
             />
+            <NotePicker tuning={tuning} capo={song.capo} value={section.singleNotes} onChange={(v) => set(`singleNotes`, v)} />
           </div>
 
           <div className="section-editor__block">

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Neck, NeckMarker } from '../components/Neck';
+import { loadPref, savePref } from './storage';
 import { emptyColumn } from './model';
 import { cellText } from './TabDisplay';
 import { TECHNIQUES, TECHNIQUE_NAMES, type TabBlock, type TabCell, type TabStep, type Technique } from './types';
@@ -6,6 +8,8 @@ import { TECHNIQUES, TECHNIQUE_NAMES, type TabBlock, type TabCell, type TabStep,
 interface TabEditorProps {
   block: TabBlock;
   stringLabels: string[];
+  /** Song capo: tab frets are relative to it, the neck shows actual frets. */
+  capo?: number;
   onChange: (block: TabBlock) => void;
 }
 
@@ -21,9 +25,11 @@ const TWO_DIGIT_WINDOW_MS = 1200;
  * Grid editor for one tab. Tap a cell (or use the arrow keys) and enter frets with the keypad
  * or keyboard. Typing two digits quickly makes a two-digit fret (1 then 2 → 12).
  */
-export function TabEditor({ block, stringLabels, onChange }: TabEditorProps) {
+export function TabEditor({ block, stringLabels, capo = 0, onChange }: TabEditorProps) {
   const stringCount = stringLabels.length;
   const [cursor, setCursor] = useState<Cursor>({ step: 0, string: 0 });
+  const [showNeck, setShowNeck] = useState(() => loadPref<string>(`tab-neck`, `on`) === `on`);
+  const [advance, setAdvance] = useState(() => loadPref<string>(`tab-neck-advance`, `on`) === `on`);
   const lastDigit = useRef<{ at: number; step: number; string: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const steps = block.steps;
@@ -32,8 +38,14 @@ export function TabEditor({ block, stringLabels, onChange }: TabEditorProps) {
   const step = Math.min(cursor.step, Math.max(0, steps.length - 1));
   const current = steps[step];
 
+  // Keep the current column visible by scrolling the grid sideways only (never the page).
   useEffect(() => {
-    gridRef.current?.querySelector(`[data-step="${step}"]`)?.scrollIntoView({ block: `nearest`, inline: `nearest` });
+    const grid = gridRef.current;
+    const el = grid?.querySelector<HTMLElement>(`[data-step="${step}"]`);
+    if (!grid || !el) return;
+    const left = el.offsetLeft - grid.offsetLeft;
+    if (left < grid.scrollLeft + 30) grid.scrollLeft = Math.max(0, left - 30);
+    else if (left + el.offsetWidth > grid.scrollLeft + grid.clientWidth) grid.scrollLeft = left + el.offsetWidth - grid.clientWidth + 10;
   }, [step]);
 
   const commit = (next: TabStep[], nextCursor?: Cursor) => {
@@ -127,6 +139,35 @@ export function TabEditor({ block, stringLabels, onChange }: TabEditorProps) {
   };
 
   const selectedCell = current && current !== `|` ? current[cursor.string] : null;
+
+  // Tapping the neck: neck string 0 is the lowest string, tab row 0 is the highest.
+  const pickFromNeck = (neckString: number, actualFret: number) => {
+    const row = stringCount - 1 - neckString;
+    const f = actualFret - capo;
+    if (f < 0) return;
+    let targetStep = step;
+    let base = steps;
+    if (current === `|` || current === undefined) {
+      base = [...steps];
+      base.splice(step + 1, 0, emptyColumn(stringCount));
+      targetStep = step + 1;
+    }
+    const col = base[targetStep] as (TabCell | null)[];
+    const existing = col[row];
+    const nextCol = col.map((c, j) => (j === row ? (existing && existing.f === f ? null : { f }) : c));
+    const next = base.map((s, i) => (i === targetStep ? nextCol : s));
+    lastDigit.current = null;
+    if (advance && !(existing && existing.f === f)) {
+      if (targetStep + 1 >= next.length) next.push(emptyColumn(stringCount));
+      commit(next, { step: targetStep + 1, string: row });
+    } else {
+      commit(next, { step: targetStep, string: row });
+    }
+  };
+  const neckNotes = (s: TabStep | undefined) =>
+    s && s !== `|` ? s.flatMap((c, row) => (c && typeof c.f === `number` ? [{ string: stringCount - 1 - row, fret: c.f + capo, text: cellText(c) }] : [])) : [];
+  const nowNotes = neckNotes(current);
+  const prevNotes = neckNotes(steps[step - 1]);
 
   return (
     <div className="tab-editor">
@@ -232,11 +273,49 @@ export function TabEditor({ block, stringLabels, onChange }: TabEditorProps) {
             Del col
           </button>
         </div>
+        <label className="ex-check tab-editor__neck-toggle">
+          <input
+            type="checkbox"
+            checked={showNeck}
+            onChange={(e) => {
+              setShowNeck(e.target.checked);
+              savePref(`tab-neck`, e.target.checked ? `on` : `off`);
+            }}
+          />
+          Fretboard
+        </label>
         <p className="tab-editor__hint">
           Keyboard: digits enter frets (type 1 then 2 fast for 12) · arrows/space move · h p / \ b r ~ t techniques · x mute · | bar · Enter
           adds a column · Shift+Delete removes it
         </p>
       </div>
+
+      {showNeck && (
+        <div className="tab-editor__neck">
+          <div className="tab-editor__neck-bar">
+            <span className="field__label">Tap the neck to enter a note in column {step + 1}</span>
+            <label className="ex-check">
+              <input
+                type="checkbox"
+                checked={advance}
+                onChange={(e) => {
+                  setAdvance(e.target.checked);
+                  savePref(`tab-neck-advance`, e.target.checked ? `on` : `off`);
+                }}
+              />
+              Move to next column after each tap
+            </label>
+          </div>
+          <Neck stringCount={stringCount} capo={capo} onPick={pickFromNeck} label="Tap a string and fret to add it to the tab">
+            {prevNotes.map((n) => (
+              <NeckMarker key={`p${n.string}-${n.fret}`} string={n.string} stringCount={stringCount} fret={n.fret} variant="ghost" capo={capo} />
+            ))}
+            {nowNotes.map((n) => (
+              <NeckMarker key={`n${n.string}-${n.fret}`} string={n.string} stringCount={stringCount} fret={n.fret} label={n.text} variant="press" capo={capo} />
+            ))}
+          </Neck>
+        </div>
+      )}
     </div>
   );
 }

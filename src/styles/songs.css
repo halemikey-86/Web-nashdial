@@ -605,6 +605,8 @@ fieldset.card {
 .sheet-section--prechorus { --section-color: #8c7a2a; }
 .section-editor--chorus,
 .sheet-section--chorus { --section-color: #c41e3a; }
+.section-editor--refrain,
+.sheet-section--refrain { --section-color: #b83a7a; }
 .section-editor--bridge,
 .sheet-section--bridge { --section-color: #5c4a7a; }
 .section-editor--vamp,
