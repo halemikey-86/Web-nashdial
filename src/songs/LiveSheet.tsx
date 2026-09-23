@@ -1,59 +1,86 @@
-import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useToast } from '../components/ui';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { getScale } from '../music/scales';
 import { getTuning } from '../music/tunings';
+import { useLibrary } from './library';
+import { SoloControls, SoloIdeaView, useSoloIdea } from './SoloBuilder';
 import { loadPref, savePref } from './storage';
-import { prefersFlats, spellNote, transposeChordText, transposeNoteText, transposeTabBlock, type TransposeContext } from './songTranspose';
+import { isChordLine, prefersFlats, spellNote, transposeChordText, transposeNoteText, transposeTabBlock, type TransposeContext } from './songTranspose';
 import { TabDisplay, hasTabContent } from './TabDisplay';
 import { stringLabels } from './tabStrings';
 import type { Song } from './types';
 
-type Part = 'chords' | 'lead' | 'notes';
+type Part = 'chords' | 'lyrics' | 'lead' | 'notes' | 'solo';
 const PARTS: { id: Part; label: string }[] = [
   { id: `chords`, label: `Chords` },
+  { id: `lyrics`, label: `Lyrics` },
   { id: `lead`, label: `Lead` },
   { id: `notes`, label: `Notes` },
+  { id: `solo`, label: `Solo` },
 ];
 
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 1.6;
+const MAX_FOCUS_SCALE = 3.2;
+const ZOOMS = [1, 1.25, 1.5, 1.75, 2, 2.5];
 
 /**
  * The whole song on one screen: every section's chords, lead (tabs and single notes) and notes,
  * flowed into columns and scaled so it all fits without scrolling, however long the song is.
+ * Tap a section to show just that one as big as possible; A−/A+ zooms past the fitted size.
  */
 export function LiveSheet({ song, ctx, hasNav }: { song: Song; ctx: TransposeContext; hasNav: boolean }) {
   const desktop = useMediaQuery(`(min-width: 960px)`);
+  const library = useLibrary();
+  const toast = useToast();
   const [show, setShow] = useState<Set<Part>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(`nashdial-live-parts`) ?? `null`);
-      if (Array.isArray(saved)) return new Set(saved as Part[]);
+      if (Array.isArray(saved)) return new Set((saved as Part[]).filter((p) => p !== `solo`));
     } catch {
       // storage unavailable
     }
-    return new Set<Part>([`chords`, `lead`, `notes`]);
+    return new Set<Part>([`chords`, `lyrics`, `lead`, `notes`]);
   });
-  const [scale, setScale] = useState(() => loadPref<number>(`live-scale`, 1));
+  const [zoom, setZoom] = useState(() => loadPref<number>(`live-zoom`, 1));
+  const [fitScale, setFitScale] = useState(1);
   const [height, setHeight] = useState<number | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
+  const idea = useSoloIdea(song);
 
   const tuning = getTuning(song.tuningId);
   const labels = stringLabels(tuning);
+  /** A section's chart as shown: transposed, and without lyric lines when Lyrics is off. */
+  const chart = (text: string) => {
+    const t = transposeChordText(text.replace(/\s+$/, ``), ctx);
+    if (show.has(`lyrics`)) return t;
+    return t
+      .split(`\n`)
+      .filter((l) => !l.trim() || isChordLine(l))
+      .join(`\n`)
+      .replace(/\n{2,}/g, `\n`)
+      .trim();
+  };
   const keyName = spellNote(ctx.playKey, prefersFlats(ctx.playKey, song.scaleId));
-  const sections = song.sections.filter(
-    (s) =>
-      (show.has(`chords`) && s.chords.trim()) ||
-      (show.has(`lead`) && (s.tabs.some((t) => hasTabContent(t.steps)) || s.singleNotes.trim())) ||
-      (show.has(`notes`) && s.notes.trim()) ||
-      (!s.chords.trim() && !s.notes.trim() && !s.singleNotes.trim() && !s.tabs.some((t) => hasTabContent(t.steps))),
-  );
+  const hasContent = (s: Song['sections'][number]) =>
+    (show.has(`chords`) && s.chords.trim()) ||
+    (show.has(`lead`) && (s.tabs.some((t) => hasTabContent(t.steps)) || s.singleNotes.trim())) ||
+    (show.has(`notes`) && s.notes.trim()) ||
+    (!s.chords.trim() && !s.notes.trim() && !s.singleNotes.trim() && !s.tabs.some((t) => hasTabContent(t.steps)));
+  const sections = song.sections.filter(hasContent);
+  const solos = show.has(`solo`) ? song.solos.filter((t) => hasTabContent(t.steps)) : [];
+  const focusIndex = focusId ? sections.findIndex((s) => s.id === focusId) : -1;
+  const focused = focusIndex >= 0 ? sections[focusIndex] : null;
+  const visibleSections = focused ? [focused] : sections;
 
-  // Columns are at least as wide as the longest chord line, so chord charts never wrap.
-  const longestChordLine = show.has(`chords`)
-    ? Math.max(0, ...sections.flatMap((s) => (s.chords.trim() ? transposeChordText(s.chords, ctx).split(`
-`).map((l) => l.trimEnd().length) : [])))
-    : 0;
+  // Leave focus if that section disappears (song change, parts hidden).
+  useEffect(() => {
+    if (focusId && focusIndex < 0) setFocusId(null);
+  }, [focusId, focusIndex]);
+  useEffect(() => setFocusId(null), [song.id]);
 
   const toggle = (p: Part) => {
     const next = new Set(show);
@@ -66,8 +93,18 @@ export function LiveSheet({ song, ctx, hasNav }: { song: Song; ctx: TransposeCon
       // storage unavailable
     }
   };
+  const bumpZoom = (dir: 1 | -1) => {
+    const i = Math.max(0, ZOOMS.findIndex((z) => z >= zoom - 0.01));
+    const next = ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, i + dir))];
+    setZoom(next);
+    savePref(`live-zoom`, next);
+  };
 
-  // Height available on screen for the sheet.
+  // Longest chord line: columns are at least that wide so chord charts never wrap.
+  const longestChordLine = show.has(`chords`)
+    ? Math.max(0, ...visibleSections.flatMap((s) => (s.chords.trim() ? chart(s.chords).split(`\n`).map((l) => l.trimEnd().length) : [])))
+    : 0;
+
   const measureHeight = useCallback(() => {
     const box = boxRef.current;
     if (!box) return;
@@ -77,20 +114,22 @@ export function LiveSheet({ song, ctx, hasNav }: { song: Song; ctx: TransposeCon
       return;
     }
     const top = box.getBoundingClientRect().top;
-    const reserve = hasNav ? 84 : 12;
-    setHeight(Math.max(240, window.innerHeight - Math.max(0, top) - reserve));
+    setHeight(Math.max(240, window.innerHeight - Math.max(0, top) - (hasNav ? 84 : 12)));
   }, [desktop, hasNav]);
 
-  // Find the largest text size at which everything fits (binary search on real layout).
+  // Largest text size at which everything fits (binary search on real layout), then apply zoom.
   const fit = useCallback(() => {
     const cols = colsRef.current;
     if (!cols) return;
+    // Measure without the zoomed view's scrollbar, which would steal height.
+    const overflow = cols.style.overflow;
+    cols.style.overflow = `hidden`;
     const fits = (s: number) => {
       cols.style.setProperty(`--fit`, String(s));
       return cols.scrollWidth <= cols.clientWidth + 1 && cols.scrollHeight <= cols.clientHeight + 1;
     };
     let lo = MIN_SCALE;
-    let hi = MAX_SCALE;
+    let hi = focused ? MAX_FOCUS_SCALE : MAX_SCALE;
     if (fits(hi)) lo = hi;
     else
       for (let i = 0; i < 9; i++) {
@@ -99,10 +138,10 @@ export function LiveSheet({ song, ctx, hasNav }: { song: Song; ctx: TransposeCon
         else hi = mid;
       }
     const best = Math.floor(lo * 100) / 100;
-    cols.style.setProperty(`--fit`, String(best));
-    setScale(best);
-    savePref(`live-scale`, best);
-  }, []);
+    cols.style.overflow = overflow;
+    cols.style.setProperty(`--fit`, String(best * zoom));
+    setFitScale(best);
+  }, [focused, zoom]);
 
   useLayoutEffect(() => {
     measureHeight();
@@ -119,15 +158,19 @@ export function LiveSheet({ song, ctx, hasNav }: { song: Song; ctx: TransposeCon
     };
   }, [measureHeight]);
 
-  // Refit whenever the space, the song, the key or the visible parts change.
   useLayoutEffect(() => {
     if (height !== null) fit();
-  }, [height, fit, song, ctx.playKey, ctx.capo, ctx.display, show, longestChordLine]);
+  }, [height, fit, song, ctx.playKey, ctx.capo, ctx.display, show, longestChordLine, focusId, idea.idea]);
   useLayoutEffect(() => {
-    // Web fonts arriving late change text widths.
     document.fonts?.ready.then(() => height !== null && fit());
   }, [fit, height]);
 
+  const saveIdea = (block: Song['solos'][number]) => {
+    library.saveSong({ ...song, solos: [...song.solos, block] });
+    toast(`Saved “${block.label}” to the song`);
+  };
+
+  const zoomed = zoom > 1.01;
   return (
     <div className="fit-sheet" ref={boxRef} style={height ? { height } : undefined}>
       <div className="fit-sheet__bar">
@@ -141,27 +184,62 @@ export function LiveSheet({ song, ctx, hasNav }: { song: Song; ctx: TransposeCon
           {song.bpm && <span className="fit-sheet__chip">{song.bpm} BPM</span>}
           {song.timeSignature !== `4/4` && <span className="fit-sheet__chip">{song.timeSignature}</span>}
         </div>
-        <div className="segmented fit-sheet__parts" role="group" aria-label="Show">
-          {PARTS.map((p) => (
-            <button key={p.id} type="button" className={`segmented__btn${show.has(p.id) ? ` segmented__btn--active` : ``}`} aria-pressed={show.has(p.id)} onClick={() => toggle(p.id)}>
-              {p.label}
+        <div className="fit-sheet__tools">
+          <div className="segmented fit-sheet__parts" role="group" aria-label="Show">
+            {PARTS.map((p) => (
+              <button key={p.id} type="button" className={`segmented__btn${show.has(p.id) ? ` segmented__btn--active` : ``}`} aria-pressed={show.has(p.id)} onClick={() => toggle(p.id)}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="segmented fit-sheet__zoom" role="group" aria-label="Text size">
+            <button type="button" className="segmented__btn" onClick={() => bumpZoom(-1)} disabled={zoom <= 1} aria-label="Smaller">
+              A−
             </button>
-          ))}
+            <button type="button" className="segmented__btn" onClick={() => bumpZoom(1)} disabled={zoom >= ZOOMS[ZOOMS.length - 1]} aria-label="Bigger">
+              A+
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="fit-sheet__cols" ref={colsRef} style={{ '--fit': scale, '--chord-ch': longestChordLine } as CSSProperties}>
-        {song.notes.trim() && show.has(`notes`) && <p className="fit-part__song-notes">{song.notes}</p>}
-        {sections.length === 0 && <p className="sheet__empty">Nothing to show yet — edit the song to add sections.</p>}
-        {sections.map((s) => {
+      {focused && (
+        <div className="fit-sheet__focus-bar">
+          <button type="button" className="btn btn--small" onClick={() => setFocusId(sections[focusIndex - 1]?.id ?? focusId)} disabled={focusIndex <= 0}>
+            ← {sections[focusIndex - 1]?.label ?? `Prev`}
+          </button>
+          <button type="button" className="btn btn--small btn--primary" onClick={() => setFocusId(null)}>
+            Show whole song
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => setFocusId(sections[focusIndex + 1]?.id ?? focusId)} disabled={focusIndex >= sections.length - 1}>
+            {sections[focusIndex + 1]?.label ?? `Next`} →
+          </button>
+        </div>
+      )}
+
+      {show.has(`solo`) && !focused && <SoloControls idea={idea} song={song} ctx={ctx} onSave={saveIdea} />}
+
+      <div
+        className={`fit-sheet__cols${zoomed ? ` fit-sheet__cols--zoomed` : ``}${focused ? ` fit-sheet__cols--focus` : ``}`}
+        ref={colsRef}
+        style={{ '--fit': fitScale * zoom, '--chord-ch': longestChordLine } as CSSProperties}
+      >
+        {!focused && song.notes.trim() && show.has(`notes`) && <p className="fit-part__song-notes">{song.notes}</p>}
+        {visibleSections.length === 0 && !solos.length && <p className="sheet__empty">Nothing to show yet — edit the song to add sections.</p>}
+        {visibleSections.map((s) => {
           const tabs = s.tabs.filter((t) => hasTabContent(t.steps));
           return (
-            <section key={s.id} className={`fit-part sheet-section--${s.type}`}>
+            <section
+              key={s.id}
+              className={`fit-part sheet-section--${s.type}${focused ? ` fit-part--focused` : ``}`}
+              onClick={() => setFocusId(focused ? null : s.id)}
+              title={focused ? `Tap to show the whole song` : `Tap to show just this section, big`}
+            >
               <h3 className="fit-part__label">
                 {s.label}
                 {s.bars ? <span className="fit-part__bars"> · {s.bars} bars</span> : null}
               </h3>
-              {show.has(`chords`) && s.chords.trim() && <pre className="fit-part__chords">{transposeChordText(s.chords.replace(/\s+$/, ``), ctx)}</pre>}
+              {show.has(`chords`) && s.chords.trim() && <pre className="fit-part__chords">{chart(s.chords)}</pre>}
               {show.has(`lead`) &&
                 tabs.map((t) => (
                   <div key={t.id} className="fit-part__tab">
@@ -174,8 +252,25 @@ export function LiveSheet({ song, ctx, hasNav }: { song: Song; ctx: TransposeCon
             </section>
           );
         })}
+        {!focused &&
+          solos.map((t) => (
+            <section key={t.id} className="fit-part fit-part--solo">
+              <h3 className="fit-part__label">{t.label || `Solo`}</h3>
+              <div className="fit-part__tab">
+                <TabDisplay steps={transposeTabBlock(t, ctx).steps} stringLabels={labels} />
+              </div>
+            </section>
+          ))}
+        {!focused && show.has(`solo`) && (
+          <section className="fit-part fit-part--solo fit-part--idea">
+            <h3 className="fit-part__label">Solo idea</h3>
+            <span className="fit-part__sublabel">{idea.idea.block.label}</span>
+            <SoloIdeaView idea={idea} song={song} ctx={ctx} />
+          </section>
+        )}
       </div>
-      {scale <= MIN_SCALE + 0.01 && <p className="fit-sheet__warn">This song is long — hide Notes or Lead to make the text bigger.</p>}
+      {!focused && !zoomed && fitScale <= MIN_SCALE + 0.01 && <p className="fit-sheet__warn">This song is long — hide Notes or Lead, or tap a section to see it big.</p>}
+      {zoomed && <p className="fit-sheet__warn">Zoomed in — swipe sideways to see the rest, or A− to fit.</p>}
     </div>
   );
 }

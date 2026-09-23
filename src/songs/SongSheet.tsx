@@ -77,6 +77,16 @@ export function SongSheet({ song, ctx, header = true, headerOnly = false }: Song
             {section.notes.trim() && <p className="sheet-section__notes">{section.notes}</p>}
           </section>
         ))}
+        {song.solos
+          .filter((t) => hasTabContent(t.steps))
+          .map((t) => (
+            <section key={t.id} className="sheet-section sheet-section--solo">
+              <h3 className="sheet-section__label">{t.label || `Solo`}</h3>
+              <div className="sheet-section__tab">
+                <TabDisplay steps={transposeTabBlock(t, ctx).steps} stringLabels={labels} />
+              </div>
+            </section>
+          ))}
       </div>}
     </article>
   );

@@ -1,6 +1,6 @@
 import type { NoteName } from '../../music/notes';
 import { createSection, createSong, createTabBlock, newId } from '../model';
-import { normalizeKeyName, transposeChord } from '../songTranspose';
+import { isChordLine as isChordLineShared, normalizeKeyName, transposeChord } from '../songTranspose';
 import { SECTION_TYPES, TECHNIQUES, type Section, type SectionType, type Song, type TabCell, type TabStep, type Technique } from '../types';
 
 /**
@@ -31,7 +31,7 @@ const HEADER_RE =
 const BRACKET_HEADER_RE = /^\s*\[([^\]]{1,40})\]\s*$/;
 const META_RE = /^\s*(title|song|artist|by|composer|key|capo|tempo|bpm|time|time signature)\s*[:=-]\s*(.+?)\s*$/i;
 const TAB_LINE_RE = /^\s*([a-gA-G][#b]?)?\s*[|:]?[-0-9hpbr/\\~x|*.()]{6,}\s*$/;
-const NON_CHORD_TOKENS = /^(\||\/|\.|-|x\d+|\d+x|n\.?c\.?|%|:|\(|\))$/i;
+const JUNK_RE = /(ccli|©|\(c\)\s*\d{4}|copyright|all rights reserved|www\.|https?:\/\/|songselect|used by permission|^page\s+\d+(\s+of\s+\d+)?$|^\d+\s*\/\s*\d+$)/i;
 
 export function sectionTypeFor(label: string): SectionType {
   const t = label.trim();
@@ -43,19 +43,9 @@ function isChordToken(token: string): boolean {
   return transposeChord(token, NEUTRAL_CTX) !== null;
 }
 
-/** A line is a chord line when (almost) every token is a chord or a bar/repeat marker. */
+/** A line is a chord line when it's mostly chords (shared with transposition, so they always agree). */
 export function isChordLine(line: string): boolean {
-  const tokens = line.trim().split(/\s+/).filter(Boolean);
-  if (!tokens.length) return false;
-  let chords = 0;
-  let other = 0;
-  for (const t of tokens) {
-    if (isChordToken(t)) chords++;
-    else if (!NON_CHORD_TOKENS.test(t)) other++;
-  }
-  // A lone "A" or "Am" on a lyric line would be ambiguous; require structure or more than one chord.
-  if (chords === 1 && tokens.length === 1 && line.trim().length > 3) return false;
-  return chords > 0 && other === 0;
+  return isChordLineShared(line);
 }
 
 function isTabLine(line: string): boolean {
@@ -118,7 +108,7 @@ interface Draft {
 
 function toSection(d: Draft): Section {
   const s = createSection(d.type, d.label);
-  s.chords = d.chords.join(`\n`);
+  s.chords = d.chords.join(`\n`).replace(/\n+$/, ``);
   s.notes = d.notes.join(`\n`).replace(/\n{3,}/g, `\n\n`).trim();
   s.tabs = d.tabs.map((steps) => ({ ...createTabBlock(6), id: newId(), steps }));
   return s;
@@ -217,10 +207,29 @@ export function parseChordSheet(text: string, fallbackTitle = ``): Song {
     const line = lines[i];
     const trimmed = line.trim();
     if (!trimmed) {
-      if (current) (current as Draft).notes.push(``);
+      const c = current as Draft | null;
+      if (c) {
+        if (c.chords.length && !c.notes.length) {
+          if (c.chords[c.chords.length - 1] !== ``) c.chords.push(``);
+        } else c.notes.push(``);
+      }
       continue;
     }
 
+    // Page furniture from printed charts (CCLI, copyright, URLs, page numbers).
+    if (JUNK_RE.test(trimmed)) continue;
+    // "Key - G | Tempo - 72 | Time - 4/4" on one line.
+    if (!current && /\b(key|tempo|bpm|time|capo)\s*[:=-]/i.test(trimmed) && /[|•·]/.test(trimmed)) {
+      let any = false;
+      for (const part of trimmed.split(/\s*[|•·]\s*/)) {
+        const m = META_RE.exec(part);
+        if (m && applyMeta(song, m[1], m[2])) {
+          any = true;
+          if (/^key$/i.test(m[1])) keyFromSheet = true;
+        }
+      }
+      if (any) continue;
+    }
     const meta = META_RE.exec(trimmed);
     if (meta && !current && applyMeta(song, meta[1], meta[2])) {
       if (/^key$/i.test(meta[1])) keyFromSheet = true;
@@ -229,7 +238,8 @@ export function parseChordSheet(text: string, fallbackTitle = ``): Song {
 
     const header = HEADER_RE.exec(trimmed) ?? (BRACKET_HEADER_RE.test(trimmed) && !isChordLine(trimmed.replace(/[[\]]/g, ``)) ? BRACKET_HEADER_RE.exec(trimmed) : null);
     if (header) {
-      const label = header[1].replace(/\s+/g, ` `).replace(/:$/, ``).trim();
+      let label = header[1].replace(/\s+/g, ` `).replace(/:$/, ``).trim();
+      if (label === label.toUpperCase()) label = label.toLowerCase();
       const type = sectionTypeFor(label);
       current = { label: label.replace(/\b\w/g, (c) => c.toUpperCase()), type, chords: [], notes: [], tabs: [] };
       drafts.push(current);
@@ -249,6 +259,11 @@ export function parseChordSheet(text: string, fallbackTitle = ``): Song {
 
     if (isChordLine(line)) {
       ensure().chords.push(line.replace(/\s+$/, ``));
+      continue;
+    }
+    // A lyric right under a chord line stays with it in the chart, keeping chords over their words.
+    if (current && (current as Draft).chords.length && !(current as Draft).notes.length) {
+      (current as Draft).chords.push(line.replace(/\s+$/, ``));
       continue;
     }
 
@@ -283,7 +298,10 @@ export function parseChordSheet(text: string, fallbackTitle = ``): Song {
   if (!song.sections.length) song.sections = [createSection(`verse`, `Verse`)];
   if (!keyFromSheet) {
     // Guess the key from the first chord in the sheet.
-    const first = song.sections.flatMap((s) => s.chords.split(/\s+/)).find((t) => isChordToken(t));
+    const first = song.sections
+      .flatMap((s) => s.chords.split(`\n`).filter((l) => isChordLine(l)))
+      .flatMap((l) => l.split(/\s+/))
+      .find((t) => isChordToken(t));
     const note = first ? normalizeKeyName(first) : null;
     if (note) {
       song.key = note as NoteName;

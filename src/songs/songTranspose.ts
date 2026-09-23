@@ -1,23 +1,10 @@
-import { mod12, noteIndex } from '../music/notes';
+import { mod12, noteIndex, prefersFlats, spellNote } from '../music/notes';
 import { signedInterval } from '../music/transpose';
 import type { TabBlock, TabStep } from './types';
 
-const SHARP_NAMES = [`C`, `C♯`, `D`, `D♯`, `E`, `F`, `F♯`, `G`, `G♯`, `A`, `A♯`, `B`];
-const FLAT_NAMES = [`C`, `D♭`, `D`, `E♭`, `E`, `F`, `G♭`, `G`, `A♭`, `A`, `B♭`, `B`];
 const NUMBER_NAMES = [`1`, `♭2`, `2`, `♭3`, `3`, `4`, `♭5`, `5`, `♭6`, `6`, `♭7`, `7`];
 
-/** Major keys conventionally written with flats: F, B♭, E♭, A♭, D♭. */
-const FLAT_MAJOR_KEYS = new Set([5, 10, 3, 8, 1]);
-const MINOR_FLAVOURED = new Set([`natural-minor`, `harmonic-minor`, `melodic-minor`, `minor-pentatonic`, `blues`, `dorian`, `phrygian`, `locrian`]);
-
-export function prefersFlats(keyIndex: number, scaleId: string): boolean {
-  const major = MINOR_FLAVOURED.has(scaleId) ? mod12(keyIndex + 3) : mod12(keyIndex);
-  return FLAT_MAJOR_KEYS.has(major);
-}
-
-export function spellNote(index: number, flats: boolean): string {
-  return (flats ? FLAT_NAMES : SHARP_NAMES)[mod12(index)];
-}
+export { prefersFlats, spellNote };
 
 /** Parse "C", "Bb", "F♯" etc. into 0–11, or -1. */
 export function parseNote(letter: string, accidental = ``): number {
@@ -105,10 +92,29 @@ export function transposeChordLine(line: string, ctx: TransposeContext): string 
     .join(``);
 }
 
+const NON_CHORD_TOKEN = /^(\||\/|\.|-|%|:|\(?x\d+\)?|\(?\d+x\)?|n\.?c\.?|\(|\))$/i;
+const NEUTRAL: TransposeContext = { songKey: 0, playKey: 0, scaleId: `major`, songCapo: 0, capo: 0, display: `sounding` };
+
+/**
+ * A chord line is one made mostly of chords (bar lines and "x2" don't count either way).
+ * Lyric lines — even ones with words like "A" or "Am I" — are not.
+ */
+export function isChordLine(line: string): boolean {
+  let chords = 0;
+  let other = 0;
+  for (const t of line.trim().split(/\s+/)) {
+    if (!t) continue;
+    if (transposeChord(t, NEUTRAL) !== null) chords++;
+    else if (!NON_CHORD_TOKEN.test(t)) other++;
+  }
+  return chords > 0 && chords > other;
+}
+
+/** Transpose a chord chart. Lines that aren't chord lines (lyrics, cues) are left exactly as written. */
 export function transposeChordText(text: string, ctx: TransposeContext): string {
   return text
     .split(`\n`)
-    .map((l) => transposeChordLine(l, ctx))
+    .map((l) => (isChordLine(l) ? transposeChordLine(l, ctx) : l))
     .join(`\n`);
 }
 

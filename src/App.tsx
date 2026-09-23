@@ -13,7 +13,7 @@ import { KeyDial } from './components/KeyDial';
 import { CapoSelector, InstrumentSelector, NashvilleNumbers, ScaleSelector, TuningSelector, ViewTabs } from './components/Selectors';
 import { ThemeJack } from './components/ThemeJack';
 import { useMediaQuery } from './hooks/useMediaQuery';
-import { KEYS } from './music/notes';
+import { KEYS, keyLabel } from './music/notes';
 import { DEFAULT_SCALE_ID, getScale, shapeKeyLabel } from './music/scales';
 import { DEFAULT_INSTRUMENT, DEFAULT_TUNING, defaultTuningFor, getTuning, tuningsFor, type InstrumentId } from './music/tunings';
 import { navigate, useRoute, type Route } from './router';
@@ -134,7 +134,7 @@ export function App() {
     <>
       <div className="amp__brand">
         <span className="amp__brand-detail">
-          {KEYS[keyIndex].label} {scale.shortName}
+          {keyLabel(keyIndex, scaleId)} {scale.shortName}
           {capo > 0 && ` · Capo ${capo}`}
         </span>
         {shapeKey && <span className="amp__brand-shape-key">Think in {shapeKey} shapes</span>}

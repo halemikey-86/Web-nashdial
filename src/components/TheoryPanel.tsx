@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { strum, unlockAudio } from '../audio';
-import { KEYS, mod12, noteIndex } from '../music/notes';
+import { KEYS, keyLabel, mod12, noteIndex, spellInKey } from '../music/notes';
 import { diatonicChords, getScale, nashvilleLabels, relativeKeyIndex, scaleNotes, type DiatonicChord } from '../music/scales';
 import { INTERVAL_NAMES, keySignature, progressionChords, progressionsFor, seventhChords, stepPattern } from '../music/theory';
 import { CapoGuide } from './CapoGuide';
@@ -51,20 +51,20 @@ export function TheoryPanel({ keyIndex, scaleId, capo, onPickCapo }: TheoryPanel
     <div className="theory">
       <section className="theory__card">
         <h3 className="theory__title">
-          {KEYS[keyIndex].label} {scale.name}
+          {keyLabel(keyIndex, scaleId)} {scale.name}
         </h3>
         <div className="theory__formula">
           {notes.map((n, i) => (
             <span key={n} className="theory__step">
               <span className={`theory__note${i === 0 ? ` theory__note--root` : ``}`}>
-                <span className="theory__note-name">{n.replace(`#`, `♯`)}</span>
+                <span className="theory__note-name">{spellInKey(n, root, scaleId)}</span>
                 <span className="theory__note-degree">{degrees[i]}</span>
               </span>
               <span className="theory__gap">{steps[i]}</span>
             </span>
           ))}
           <span className="theory__note theory__note--root">
-            <span className="theory__note-name">{root.replace(`#`, `♯`)}</span>
+            <span className="theory__note-name">{spellInKey(root, root, scaleId)}</span>
             <span className="theory__note-degree">8</span>
           </span>
         </div>
@@ -73,12 +73,12 @@ export function TheoryPanel({ keyIndex, scaleId, capo, onPickCapo }: TheoryPanel
           {sig && <li>Key signature: {sig.label}</li>}
           {relative !== null && (
             <li>
-              Relative {scaleId === `major` ? `minor` : `major`}: {KEYS[relative].label}
+              Relative {scaleId === `major` ? `minor` : `major`}: {keyLabel(relative, scaleId === `major` ? `natural-minor` : `major`)}
               {scaleId === `major` ? `m` : ``} — same notes, different home note
             </li>
           )}
           <li>
-            Parallel {scaleId === `major` ? `minor` : `major`}: {KEYS[keyIndex].label}
+            Parallel {scaleId === `major` ? `minor` : `major`}: {keyLabel(keyIndex, scaleId === `major` ? `natural-minor` : `major`)}
             {scaleId === `major` ? `m` : ``} — same home note, different notes
           </li>
         </ul>
@@ -158,7 +158,7 @@ export function TheoryPanel({ keyIndex, scaleId, capo, onPickCapo }: TheoryPanel
       )}
 
       <section className="theory__card">
-        <h3 className="theory__title">Intervals from {KEYS[keyIndex].label}</h3>
+        <h3 className="theory__title">Intervals from {keyLabel(keyIndex, scaleId)}</h3>
         <table className="theory__table theory__table--intervals">
           <thead>
             <tr>
@@ -176,7 +176,7 @@ export function TheoryPanel({ keyIndex, scaleId, capo, onPickCapo }: TheoryPanel
                   <td>{st}</td>
                   <td>{name}</td>
                   <td>
-                    <strong>{note.label}</strong>
+                    <strong>{spellInKey(note.root, root, scaleId)}</strong>
                     {on && st > 0 && st < 12 ? <span className="theory__muted"> in scale</span> : null}
                   </td>
                 </tr>

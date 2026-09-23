@@ -1,7 +1,7 @@
 import { getScale } from '../music/scales';
 import { getTuning } from '../music/tunings';
 import type { NoteName } from '../music/notes';
-import { normalizeKeyName } from './songTranspose';
+import { isChordLine, normalizeKeyName } from './songTranspose';
 import {
   SCHEMA_VERSION,
   SECTION_TYPES,
@@ -32,14 +32,12 @@ export function sectionBars(section: Pick<Section, 'bars' | 'chords' | 'tabs'>):
   if (section.bars) return { bars: section.bars, estimated: false };
   const text = section.chords.trim();
   if (text) {
-    if (text.includes(`|`)) {
-      const measures = text
-        .split(`\n`)
-        .flatMap((l) => l.split(`|`))
-        .filter((m) => m.trim()).length;
+    const chordLines = text.split(`\n`).filter((l) => isChordLine(l));
+    if (chordLines.some((l) => l.includes(`|`))) {
+      const measures = chordLines.flatMap((l) => l.split(`|`)).filter((m) => m.trim()).length;
       if (measures) return { bars: measures, estimated: true };
     }
-    const chords = text.split(/\s+/).filter((t) => /^[(\[]?[A-G]/.test(t)).length;
+    const chords = chordLines.join(` `).split(/\s+/).filter((t) => /^[(\[]?[A-G]/.test(t)).length;
     if (chords) return { bars: chords, estimated: true };
   }
   const tabMeasures = Math.max(
@@ -94,6 +92,7 @@ export function createSong(): Song {
     timeSignature: `4/4`,
     notes: ``,
     sections: [],
+    solos: [],
     createdAt: t,
     updatedAt: t,
   };
@@ -214,6 +213,7 @@ export function normalizeSong(v: unknown): Song | null {
     sections: Array.isArray(v.sections)
       ? v.sections.map((s) => normalizeSection(s, stringCount)).filter((s): s is Section => s !== null)
       : [],
+    solos: Array.isArray(v.solos) ? v.solos.map((x) => normalizeTab(x, stringCount)).filter((x): x is TabBlock => x !== null) : [],
     createdAt: str(v.createdAt) || t,
     updatedAt: str(v.updatedAt) || t,
   };

@@ -159,7 +159,7 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
   // Horizontal swipe on the sheet changes songs.
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
   const onPointerDown = (e: ReactPointerEvent) => {
-    if (e.pointerType !== `touch` || (e.target as HTMLElement).closest(`.tab-display, .live, .fit-sheet__parts`)) return;
+    if (e.pointerType !== `touch` || (e.target as HTMLElement).closest(`.tab-display, .live, .fit-sheet__tools, .fit-sheet__cols--zoomed, .solo-controls`)) return;
     swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
   };
   const onPointerUp = (e: ReactPointerEvent) => {

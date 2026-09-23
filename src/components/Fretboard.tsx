@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { buildFretboard, type FretCell } from '../music/fretboard';
-import { KEYS, displayNote, mod12, noteAt, noteIndex } from '../music/notes';
+import { KEYS, displayNote, mod12, noteAt, noteIndex, spellInKey } from '../music/notes';
 import { diatonicChords, nashvilleLabels, type ChordQuality } from '../music/scales';
 import { PIECE_CELLS, PIECE_INFO, PIECE_ORDER, findPieces, pieceMap, type Piece, type PieceType } from '../music/tetrisShapes';
 import { INVERSIONS, INVERSION_INFO, stringSetName, triadVoicings, type Inversion } from '../music/triads';
@@ -394,8 +394,8 @@ export function Fretboard({
         ? (tones.get(cell.note) ?? ``)
         : cell.degree
           ? degrees[cell.degree - 1]
-          : displayNote(cell.note)
-      : displayNote(cell.note);
+          : spellInKey(cell.note, root, scaleId)
+      : spellInKey(cell.note, root, scaleId);
   const triadName = `${KEYS[mod12(noteIndex(triad.root))].label}${TRIAD_INTERVALS[triad.quality].suffix}`;
   const props: BoardProps = { rows, tuning, capoFret, view, label, shapeAt };
 
@@ -445,7 +445,7 @@ export function Fretboard({
             <>
               <TriadPicker keyRoot={root} scaleId={scaleId} root={triad.root} quality={triad.quality} onChange={(r, q) => setTriad({ root: r, quality: q })} />
               <p className="shape-source__hint">
-                <strong>{triadName}</strong> ({[...tones.entries()].map(([n, l]) => `${l} = ${displayNote(n)}`).join(` · `)}) as 3-note shapes on neighboring strings. Color = which note is on the bottom: purple root, yellow 3rd (1st inversion), cyan 5th (2nd inversion). Tap a color or string set to practice just those.
+                <strong>{triadName}</strong> ({[...tones.entries()].map(([n, l]) => `${l} = ${spellInKey(n, triad.root, triad.quality === `minor` || triad.quality === `dim` ? `natural-minor` : `major`)}`).join(` · `)}) as 3-note shapes on neighboring strings. Color = which note is on the bottom: purple root, yellow 3rd (1st inversion), cyan 5th (2nd inversion). Tap a color or string set to practice just those.
               </p>
             </>
           )}

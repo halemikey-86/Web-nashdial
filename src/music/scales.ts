@@ -1,4 +1,4 @@
-import { KEYS, displayNote, mod12, noteAt, noteIndex } from './notes';
+import { KEYS, mod12, noteAt, noteIndex, prefersFlats, spellNote } from './notes';
 
 export type ChordQuality = 'major' | 'minor' | 'dim' | 'aug';
 export type ScaleCategory = 'key' | 'modes' | 'scales';
@@ -187,6 +187,8 @@ function inferTriad(root: string, notes: Set<string>): { quality: ChordQuality; 
 export function diatonicChords(root: string, scaleId: string): DiatonicChord[] {
   const scale = getScale(scaleId);
   const notes = scaleNotes(root, scaleId);
+  const flats = prefersFlats(noteIndex(root), scaleId);
+  const displayNote = (n: string) => spellNote(noteIndex(n), flats);
   if (scale.chordQualities && scale.chordSuffixes) {
     const { chordQualities, chordSuffixes } = scale;
     return notes.map((note, i) => ({

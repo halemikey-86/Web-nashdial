@@ -1,4 +1,4 @@
-import { KEYS, mod12, noteIndex } from './notes';
+import { KEYS, mod12, noteIndex, spellInKey } from './notes';
 import { diatonicChords, getScale, scaleNotes, type DiatonicChord } from './scales';
 
 /** Circle-of-fifths position of each major key (C = 0, G = 1 … F = 11). */
@@ -75,7 +75,8 @@ export function seventhChords(root: string, scaleId: string): SeventhChord[] {
       .map((t) => mod12(noteIndex(t) - r))
       .join(`,`);
     const q = SEVENTH_NAMES[key] ?? { suffix: `7`, name: `7th` };
-    return { degree: i + 1, label: `${n.replace(`#`, `♯`)}${q.suffix}`, quality: q.name, tones: tones.map((t) => t.replace(`#`, `♯`)) };
+    const spell = (x: string) => spellInKey(x, root, scaleId);
+    return { degree: i + 1, label: `${spell(n)}${q.suffix}`, quality: q.name, tones: tones.map(spell) };
   });
 }
 

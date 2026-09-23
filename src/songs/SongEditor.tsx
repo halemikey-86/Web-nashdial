@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import { Field, PageHeader, useToast } from '../components/ui';
 import { ScaleSelector } from '../components/Selectors';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { KEYS, CAPO_FRETS, capoLabel, noteIndex, type NoteName } from '../music/notes';
+import { KEYS, CAPO_FRETS, asciiAccidentals, capoLabel, noteIndex, type NoteName } from '../music/notes';
 import { diatonicChords } from '../music/scales';
 import { INSTRUMENTS, TUNINGS, getTuning, midiName, openStringMidi, type Tuning } from '../music/tunings';
 import { Neck, NeckMarker } from '../components/Neck';
@@ -14,6 +14,7 @@ import { fileSlug, saveJsonFile, songFile } from './io';
 import { shareFile } from './share';
 import { SongSheet } from './SongSheet';
 import { TabEditor } from './TabEditor';
+import { SoloBuilder } from './SoloBuilder';
 import { stringLabels } from './tabStrings';
 import { SECTION_TYPES, type Section, type SectionType, type Song } from './types';
 
@@ -192,7 +193,7 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
             <span className="field__label">Chords</span>
             <div className="chord-palette" role="group" aria-label="Insert chord">
               {palette.map((c) => (
-                <button key={c.degree} type="button" className="chip-btn" onClick={() => insertAtCursor(chordsRef.current, section.chords, c.label.replace(`♯`, `#`), (v) => set(`chords`, v))}>
+                <button key={c.degree} type="button" className="chip-btn" onClick={() => insertAtCursor(chordsRef.current, section.chords, asciiAccidentals(c.label), (v) => set(`chords`, v))}>
                   {c.label}
                 </button>
               ))}
@@ -294,6 +295,7 @@ export function SongEditor({ songId }: { songId: string | null }) {
   const [dirty, setDirty] = useState(!stored);
   const [preview, setPreview] = useState(false);
   const [customName, setCustomName] = useState(``);
+  const [soloBuilder, setSoloBuilder] = useState(false);
   /** Sections folded down to their header. New songs and imports start with everything open. */
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleSection = (id: string) =>
@@ -663,6 +665,49 @@ export function SongEditor({ songId }: { songId: string | null }) {
             + Add custom
           </button>
         </form>
+      </div>
+
+      <div className="card solos-editor">
+        <div className="solos-editor__head">
+          <span className="field__label">Solos &amp; fills</span>
+          <span className="solos-editor__hint">Written in {draft.key} — they follow the key dial in Live and Sheet.</span>
+        </div>
+        {draft.solos.map((solo, i) => (
+          <div key={solo.id} className="section-editor__tab">
+            <div className="section-editor__tab-head">
+              <input
+                className="input input--compact"
+                value={solo.label}
+                placeholder="e.g. Chorus solo, Outro lick"
+                onChange={(e) => set(`solos`, draft.solos.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                aria-label="Solo name"
+              />
+              <button
+                type="button"
+                className="btn btn--icon btn--danger"
+                onClick={() => confirm(`Delete this solo?`) && set(`solos`, draft.solos.filter((_, j) => j !== i))}
+                aria-label="Delete solo"
+              >
+                ✕
+              </button>
+            </div>
+            <TabEditor
+              block={solo}
+              stringLabels={stringLabels(getTuning(draft.tuningId))}
+              capo={draft.capo}
+              onChange={(b) => set(`solos`, draft.solos.map((x, j) => (j === i ? b : x)))}
+            />
+          </div>
+        ))}
+        <div className="solos-editor__actions">
+          <button type="button" className="btn btn--small" onClick={() => set(`solos`, [...draft.solos, { ...createTabBlock(getTuning(draft.tuningId).strings.length), label: `Solo ${draft.solos.length + 1}` }])}>
+            + Write a solo
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => setSoloBuilder((b) => !b)} aria-expanded={soloBuilder}>
+            {soloBuilder ? `Hide pattern builder` : `Build one from a pattern`}
+          </button>
+        </div>
+        {soloBuilder && <SoloBuilder song={draft} onSave={(block) => set(`solos`, [...draft.solos, block])} />}
       </div>
     </div>
   );

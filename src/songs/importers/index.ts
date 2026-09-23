@@ -53,7 +53,56 @@ async function readMxl(buf: ArrayBuffer): Promise<string> {
   return inflate(score);
 }
 
-/** Pull text out of a PDF, keeping line breaks and the spacing that lines chords up over lyrics. */
+interface PdfItem {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  str: string;
+}
+
+/** Group text items into lines, allowing a little vertical wobble (chords set slightly higher, mixed fonts). */
+function toLines(items: PdfItem[]): PdfItem[][] {
+  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
+  const lines: { y: number; items: PdfItem[] }[] = [];
+  for (const it of sorted) {
+    const tol = Math.max(2, it.h * 0.35);
+    const line = lines.find((l) => Math.abs(l.y - it.y) <= tol);
+    if (line) line.items.push(it);
+    else lines.push({ y: it.y, items: [it] });
+  }
+  return lines.sort((a, b) => b.y - a.y).map((l) => l.items.sort((a, b) => a.x - b.x));
+}
+
+/** Render lines as monospace text, placing each item by its x position so chords stay above their words. */
+function linesToText(lines: PdfItem[][], left: number, charW: number): string[] {
+  const out: string[] = [];
+  let lastY: number | null = null;
+  let lastH = 12;
+  for (const items of lines) {
+    const y = items[0].y;
+    // A gap of well over one line means a blank line between blocks.
+    if (lastY !== null && lastY - y > lastH * 1.9) out.push(``);
+    lastY = y;
+    lastH = Math.max(...items.map((i) => i.h)) || lastH;
+    let line = ``;
+    let prevEnd = -Infinity;
+    for (const it of items) {
+      let col = Math.max(line.length, Math.round((it.x - left) / charW));
+      // Keep words apart when they collide after rounding but had a real gap on the page.
+      if (col === line.length && line && !line.endsWith(` `) && !it.str.startsWith(` `) && it.x - prevEnd > charW * 0.3) col++;
+      line = line.padEnd(col) + it.str;
+      prevEnd = it.x + it.w;
+    }
+    out.push(line.replace(/\s+$/, ``));
+  }
+  return out;
+}
+
+/**
+ * Pull text out of a PDF so the chord-sheet parser can read it: keeps line breaks, keeps the spacing
+ * that lines chords up over lyrics, and reads two-column pages left column first.
+ */
 async function readPdfText(buf: ArrayBuffer): Promise<string> {
   const pdfjs = await import(`pdfjs-dist`);
   const { default: workerUrl } = await import(`pdfjs-dist/build/pdf.worker.min.mjs?url`);
@@ -62,31 +111,37 @@ async function readPdfText(buf: ArrayBuffer): Promise<string> {
   const out: string[] = [];
   for (let n = 1; n <= pdf.numPages; n++) {
     const page = await pdf.getPage(n);
+    const width = page.getViewport({ scale: 1 }).width;
     const content = await page.getTextContent();
-    const items = content.items.filter((i): i is (typeof content.items)[number] & { str: string; transform: number[]; width: number } => `str` in i);
-    // Average character width sets how many spaces a horizontal gap is worth.
-    const widths = items.filter((i) => i.str.trim()).map((i) => i.width / Math.max(1, i.str.length));
+    const items: PdfItem[] = [];
+    for (const raw of content.items) {
+      if (!(`str` in raw) || !raw.str) continue;
+      const h = Math.abs(raw.transform[3]) || Math.abs(raw.height) || 10;
+      items.push({ x: raw.transform[4], y: raw.transform[5], w: raw.width, h, str: raw.str });
+    }
+    if (!items.some((i) => i.str.trim())) continue;
+    // Typical character width: median of (width / length) over text items.
+    const widths = items.filter((i) => i.str.trim().length > 1).map((i) => i.w / i.str.length);
     const charW = widths.length ? widths.sort((a, b) => a - b)[Math.floor(widths.length / 2)] : 5;
-    const lines = new Map<number, { x: number; str: string; w: number }[]>();
-    for (const it of items) {
-      const y = Math.round(it.transform[5] / 2) * 2;
-      if (!lines.has(y)) lines.set(y, []);
-      lines.get(y)!.push({ x: it.transform[4], str: it.str, w: it.width });
-    }
-    const ys = [...lines.keys()].sort((a, b) => b - a);
-    let lastY: number | null = null;
-    for (const y of ys) {
-      if (lastY !== null && lastY - y > 22) out.push(``);
-      lastY = y;
-      const parts = lines.get(y)!.sort((a, b) => a.x - b.x);
-      let line = ``;
-      for (const part of parts) {
-        const col = Math.max(line.length, Math.round(part.x / charW) - 6);
-        line = line.padEnd(col) + part.str;
+
+    // Two columns? Look for a vertical gap in the middle third that no text crosses.
+    let split: number | null = null;
+    const body = items.filter((i) => i.str.trim());
+    for (let x = width * 0.35; x <= width * 0.65; x += 4) {
+      const crossing = body.some((i) => i.x < x && i.x + i.w > x);
+      const leftCount = body.filter((i) => i.x + i.w <= x).length;
+      const rightCount = body.filter((i) => i.x >= x).length;
+      if (!crossing && leftCount > body.length * 0.2 && rightCount > body.length * 0.2) {
+        split = x;
+        break;
       }
-      out.push(line.replace(/\s+$/, ``));
     }
-    out.push(``);
+    // Title/header lines that span the page (wide items above the columns) are read first.
+    const columns = split === null ? [body] : [body.filter((i) => i.x + i.w <= split!), body.filter((i) => i.x >= split!)];
+    for (const col of columns) {
+      const left = Math.min(...col.map((i) => i.x));
+      out.push(...linesToText(toLines(col), left, charW), ``);
+    }
   }
   const text = out.join(`\n`);
   if (!text.trim()) throw new Error(`That PDF has no text to read (it may be a scanned image).`);

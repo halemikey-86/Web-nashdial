@@ -134,6 +134,12 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
+  /* Always the stretchy second row, even when the key panel (row one) is closed; otherwise the
+     sheet would size to its content and the fit-to-screen height would shrink on every refit. */
+  .stage--full .stage__sheet {
+    grid-row: 2;
+    min-height: 0;
+  }
   .stage--full .stage__controls {
     display: grid;
     grid-template-columns: 260px repeat(auto-fit, minmax(200px, 1fr));
@@ -149,4 +155,94 @@
   .stage--view-live .stage__sheet {
     padding-bottom: 0;
   }
+}
+
+/* ---------- Live: tools, zoom, focus, solos ---------- */
+
+.fit-sheet__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fit-sheet__zoom .segmented__btn {
+  min-height: 30px;
+  padding: 3px 10px;
+  font-weight: 900;
+}
+.fit-sheet__cols--zoomed {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.fit-part {
+  cursor: zoom-in;
+}
+.fit-part--focused {
+  cursor: zoom-out;
+}
+.fit-sheet__focus-bar {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+}
+.sheet-section--solo,
+.fit-part--solo {
+  --section-color: #e8283c;
+  cursor: default;
+}
+.fit-part--idea {
+  border-left-style: dashed;
+}
+.solo-controls {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.solo-controls .input {
+  width: auto;
+  max-width: 100%;
+}
+.solo-controls .segmented__btn {
+  min-height: 32px;
+  padding: 3px 10px;
+}
+.solo-idea__tip {
+  margin: 0 0 4px;
+  color: var(--theme-text-muted);
+  font-size: calc(var(--fit, 1) * 12px);
+  font-style: italic;
+}
+.solo-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px dashed var(--theme-control-border);
+  border-radius: 6px;
+}
+.solo-builder .solo-idea__tip {
+  font-size: 0.78rem;
+}
+.solos-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.solos-editor__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.solos-editor__hint {
+  color: var(--theme-text-muted);
+  font-size: 0.72rem;
+}
+.solos-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }

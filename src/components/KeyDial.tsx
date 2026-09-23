@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, type PointerEvent } from 'react';
-import { KEYS } from '../music/notes';
+import { KEYS, keyLabel, keyName } from '../music/notes';
 import { getScale, hasRelativeKey, relativeKeyIndex } from '../music/scales';
 
 /** Circle-of-fifths order of key indices, starting at C. */
@@ -15,7 +15,7 @@ function signatureLabel(position: number): string {
 }
 
 function relativeMinorLabel(keyIndex: number): string {
-  return KEYS[(keyIndex + 9) % 12].label.toLowerCase();
+  return keyName(keyIndex + 9, true).toLowerCase();
 }
 
 function geometry(componentSize: number, faceSize: number) {
@@ -200,11 +200,11 @@ export function KeyDial({ selectedIndex, onChange, variant = `primary`, scaleId 
             </div>
           </div>
           <div className="key-dial__knob-readout">
-            <span className="key-dial__center-label">{KEYS[selectedIndex].label}</span>
+            <span className="key-dial__center-label">{keyLabel(selectedIndex, scaleId)}</span>
             {!isTranspose && <span className="key-dial__center-sub">{subLabel ?? scale.shortName}</span>}
             {showRelative && relative !== null && (
               <span className="key-dial__center-relative">
-                {relativeLabel}: {KEYS[relative].label}
+                {relativeLabel}: {keyName(relative, scaleId === `major`)}
               </span>
             )}
           </div>

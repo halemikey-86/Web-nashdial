@@ -80,6 +80,8 @@ export interface Song {
   timeSignature: string;
   notes: string;
   sections: Section[];
+  /** Solos and fills for the whole song, written in the song's key (they transpose with it). */
+  solos: TabBlock[];
   createdAt: string;
   updatedAt: string;
 }

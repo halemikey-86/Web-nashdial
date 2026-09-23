@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { songFile } from '../io';
 import { createSong } from '../model';
 import { decodeShare, encodeShare, extractShareCode } from '../share';
+import { transposeChordText } from '../songTranspose';
 import { chordProToText, isChordLine, parseChordSheet, parseTabBlock } from './textSheet';
 
 const SHEET = `Amazing Grace - Traditional
@@ -51,12 +52,14 @@ describe(`chord sheet import`, () => {
     ]);
   });
 
-  it(`keeps chords in the chart and lyrics in notes`, () => {
+  it(`keeps lyrics under their chords in the chart, and transposes only the chords`, () => {
     const verse = song.sections[1];
-    expect(verse.chords.split(`\n`)).toHaveLength(2);
-    expect(verse.chords).toContain(`G7`);
-    expect(verse.notes).toContain(`Amazing grace`);
-    expect(verse.chords).not.toContain(`Amazing`);
+    const lines = verse.chords.split(`\n`);
+    expect(lines[0]).toMatch(/^G\s+G7\s+C\s+G$/);
+    expect(lines[1]).toBe(`Amazing grace, how sweet the sound`);
+    const up = transposeChordText(verse.chords, { songKey: 7, playKey: 9, scaleId: `major`, songCapo: 0, capo: 0, display: `sounding` }).split(`\n`);
+    expect(up[0]).toMatch(/^A\s+A7\s+D\s+A$/);
+    expect(up[1]).toBe(`Amazing grace, how sweet the sound`);
   });
 
   it(`turns ASCII tab into editable tab steps`, () => {
