@@ -6,7 +6,10 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { noteIndex } from '../music/notes';
 import { describeInterval, intervalBetween } from '../music/transpose';
 import { loadPref, savePref } from './storage';
+import { DrumView, DrumsticksIcon } from './DrumView';
 import { LiveView } from './LiveView';
+
+type StageView = 'sheet' | 'live' | 'drums';
 import { SongSheet } from './SongSheet';
 import { prefersFlats, spellNote, type ChordDisplay, type TransposeContext } from './songTranspose';
 import type { Song } from './types';
@@ -91,8 +94,11 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
   const [display, setDisplay] = useState<ChordDisplay>(() => loadPref<string>(`chord-display`, `sounding`) as ChordDisplay);
   const [fontScale, setFontScale] = useState(() => loadPref<number>(`sheet-scale`, 1));
   const [controlsOpen, setControlsOpen] = useState(false);
-  const [stageView, setStageView] = useState<'sheet' | 'live'>(() => (loadPref<string>(`stage-view`, `sheet`) === `live` ? `live` : `sheet`));
-  const pickStageView = (v: 'sheet' | 'live') => {
+  const [stageView, setStageView] = useState<StageView>(() => {
+    const saved = loadPref<string>(`stage-view`, `sheet`);
+    return saved === `live` || saved === `drums` ? saved : `sheet`;
+  });
+  const pickStageView = (v: StageView) => {
     setStageView(v);
     savePref(`stage-view`, v);
   };
@@ -172,7 +178,7 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
   const showControls = desktop || controlsOpen;
 
   return (
-    <div className={`stage${nav ? ` stage--with-nav` : ``}`}>
+    <div className={`stage${nav ? ` stage--with-nav` : ``}${stageView === `drums` ? ` stage--drums` : ``}`}>
       <div className="stage__bar">
         <button type="button" className="btn btn--ghost stage__back" onClick={onBack}>
           ← <span className="stage__back-label">{backLabel}</span>
@@ -192,8 +198,18 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
           <button type="button" role="tab" aria-selected={stageView === `live`} className={`segmented__btn${stageView === `live` ? ` segmented__btn--active` : ``}`} onClick={() => pickStageView(`live`)}>
             Live
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stageView === `drums`}
+            className={`segmented__btn stage__drums-btn${stageView === `drums` ? ` segmented__btn--active` : ``}`}
+            onClick={() => pickStageView(`drums`)}
+            title="Drummer view: structure, tempo and click"
+          >
+            <DrumsticksIcon size={16} /> Drums
+          </button>
         </div>
-        {!desktop && (
+        {!desktop && stageView !== `drums` && (
           <button type="button" className={`btn stage__key-btn${controlsOpen ? ` stage__key-btn--open` : ``}`} onClick={() => setControlsOpen((o) => !o)} aria-expanded={controlsOpen}>
             Key {keyLabel}
             {capo > 0 && ` · Capo ${capo}`} {controlsOpen ? `▴` : `▾`}
@@ -205,7 +221,7 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
       </div>
 
       <div className="stage__body">
-        {showControls && (
+        {showControls && stageView !== `drums` && (
           <aside className="stage__controls" aria-label="Key and display">
             <p className="app__dial-label">Play in — turn the dial to change key</p>
             <FitDial>
@@ -264,7 +280,9 @@ export function SongStage({ song, playKey, capo, onPlayKeyChange, onCapoChange, 
           onPointerUp={onPointerUp}
           onPointerCancel={() => (swipe.current = null)}
         >
-          {stageView === `live` ? (
+          {stageView === `drums` ? (
+            <DrumView song={song} />
+          ) : stageView === `live` ? (
             <>
               <SongSheet song={song} ctx={ctx} headerOnly />
               <LiveView key={song.id} song={song} ctx={ctx} />

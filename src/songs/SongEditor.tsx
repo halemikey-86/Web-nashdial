@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Field, PageHeader, useToast } from '../components/ui';
 import { ScaleSelector } from '../components/Selectors';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -9,7 +9,7 @@ import { Neck, NeckMarker } from '../components/Neck';
 import { loadPref, savePref } from './storage';
 import { navigate } from '../router';
 import { useLibrary } from './library';
-import { createSection, createSong, createTabBlock, emptyColumn, newId, nextSectionLabel, songDisplayName } from './model';
+import { TIME_SIGNATURES, createSection, createSong, createTabBlock, emptyColumn, newId, nextSectionLabel, sectionBars, songDisplayName } from './model';
 import { fileSlug, saveJsonFile, songFile } from './io';
 import { SongSheet } from './SongSheet';
 import { TabEditor } from './TabEditor';
@@ -112,9 +112,12 @@ interface SectionEditorProps {
   onMove: (dir: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** Press on the header (or grip) to start dragging this section. */
+  onDragStart: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  dragging: boolean;
 }
 
-function SectionEditor({ section, song, index, count, onChange, onMove, onDuplicate, onDelete }: SectionEditorProps) {
+function SectionEditor({ section, song, index, count, onChange, onMove, onDuplicate, onDelete, onDragStart, dragging }: SectionEditorProps) {
   const [open, setOpen] = useState(true);
   const chordsRef = useRef<HTMLTextAreaElement>(null);
   const tuning = getTuning(song.tuningId);
@@ -123,8 +126,11 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
   const set = <K extends keyof Section>(key: K, value: Section[K]) => onChange({ ...section, [key]: value });
 
   return (
-    <div className={`section-editor section-editor--${section.type}`}>
-      <div className="section-editor__head">
+    <div className={`section-editor section-editor--${section.type}${dragging ? ` section-editor--dragging` : ``}`} data-section-id={section.id}>
+      <div className="section-editor__head" onPointerDown={onDragStart}>
+        <span className="section-editor__grip" title="Drag to move (or press and hold the header)" aria-hidden>
+          ⠿
+        </span>
         <button
           type="button"
           className="section-editor__toggle"
@@ -141,7 +147,27 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
             </option>
           ))}
         </select>
-        <input className="input input--compact section-editor__label" value={section.label} onChange={(e) => set(`label`, e.target.value)} aria-label="Section name" />
+        <input
+          className="input input--compact section-editor__label"
+          value={section.label}
+          onChange={(e) => set(`label`, e.target.value)}
+          aria-label="Section name"
+          placeholder={section.type === `custom` ? `Name this section` : undefined}
+        />
+        <label className="section-editor__bars" title="Length in bars (for the drum view)">
+          <input
+            className="input input--compact"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={256}
+            value={section.bars ?? ``}
+            placeholder={`≈${sectionBars({ ...section, bars: null }).bars}`}
+            onChange={(e) => set(`bars`, e.target.value ? Math.max(1, Math.min(256, Number(e.target.value))) : null)}
+            aria-label="Bars"
+          />
+          <span>bars</span>
+        </label>
         <div className="section-editor__tools">
           <button type="button" className="btn btn--icon" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move section up">
             ▲
@@ -265,6 +291,12 @@ export function SongEditor({ songId }: { songId: string | null }) {
   const [draft, setDraft] = useState<Song>(() => (stored ? structuredClone(stored) : createSong()));
   const [dirty, setDirty] = useState(!stored);
   const [preview, setPreview] = useState(false);
+  const [customName, setCustomName] = useState(``);
+  const listRef = useRef<HTMLDivElement>(null);
+  /** The section being dragged, where it would drop (index among the others), and the pointer's y. */
+  const [drag, setDrag] = useState<{ id: string; target: number; y: number } | null>(null);
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
   const sideBySide = useMediaQuery(`(min-width: 1200px)`);
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -289,6 +321,132 @@ export function SongEditor({ songId }: { songId: string | null }) {
     if (history.length > 1) history.back();
     else navigate(stored ? { name: `song`, id: draft.id } : { name: `songs` });
   };
+
+  // ---- Drag to reorder sections ----------------------------------------------------------------
+  const scroller = (): HTMLElement | null => {
+    const page = listRef.current?.closest<HTMLElement>(`.page`);
+    return page && page.scrollHeight > page.clientHeight + 1 && getComputedStyle(page).overflowY !== `visible` ? page : null;
+  };
+  const dropIndex = (y: number, id: string): number => {
+    const els = [...(listRef.current?.querySelectorAll<HTMLElement>(`[data-section-id]`) ?? [])].filter((el) => el.dataset.sectionId !== id);
+    return els.filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2 < y;
+    }).length;
+  };
+  const beginDrag = (id: string, y: number) => {
+    navigator.vibrate?.(12);
+    setDrag({ id, target: draft.sections.findIndex((x) => x.id === id), y });
+  };
+  const holdTimer = useRef<number | undefined>(undefined);
+  const pressSection = (id: string, e: ReactPointerEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement;
+    const onGrip = !!t.closest(`.section-editor__grip`);
+    if (!onGrip && t.closest(`input, select, textarea, button, label`)) return;
+    if (e.pointerType === `mouse` && e.button !== 0) return;
+    if (onGrip && e.pointerType === `mouse`) {
+      e.preventDefault();
+      beginDrag(id, e.clientY);
+      return;
+    }
+    // Touch/pen, or a mouse on the header: press and hold to pick the section up.
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let lastY = y0;
+    const cleanup = () => {
+      window.clearTimeout(holdTimer.current);
+      window.removeEventListener(`pointermove`, onMove);
+      window.removeEventListener(`pointerup`, cleanup);
+      window.removeEventListener(`pointercancel`, cleanup);
+    };
+    const onMove = (ev: PointerEvent) => {
+      lastY = ev.clientY;
+      if (Math.abs(ev.clientX - x0) > 10 || Math.abs(ev.clientY - y0) > 10) cleanup();
+    };
+    window.addEventListener(`pointermove`, onMove);
+    window.addEventListener(`pointerup`, cleanup);
+    window.addEventListener(`pointercancel`, cleanup);
+    holdTimer.current = window.setTimeout(
+      () => {
+        cleanup();
+        beginDrag(id, lastY);
+      },
+      onGrip ? 150 : 400,
+    );
+  };
+
+  // While dragging: follow the pointer, auto-scroll near the edges, drop on release.
+  const isDragging = drag !== null;
+  useEffect(() => {
+    if (!isDragging) return;
+    let y = dragRef.current?.y ?? 0;
+    const follow = () => {
+      const d = dragRef.current;
+      if (!d) return;
+      const target = dropIndex(y, d.id);
+      if (target !== d.target || y !== d.y) setDrag({ ...d, target, y });
+    };
+    const onMove = (ev: PointerEvent) => {
+      y = ev.clientY;
+      follow();
+    };
+    const blockScroll = (ev: TouchEvent) => ev.preventDefault();
+    const finish = (commit: boolean) => {
+      const d = dragRef.current;
+      setDrag(null);
+      if (!commit || !d) return;
+      const current = draftRef.current.sections;
+      const moved = current.find((x) => x.id === d.id);
+      if (!moved) return;
+      const rest = current.filter((x) => x.id !== d.id);
+      rest.splice(d.target, 0, moved);
+      if (rest.some((x, i) => x.id !== current[i].id)) update({ ...draftRef.current, sections: rest });
+    };
+    const onUp = () => finish(true);
+    const onCancel = () => finish(false);
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === `Escape`) finish(false);
+    };
+    const timer = window.setInterval(() => {
+      const edge = 80;
+      const speed = y < edge ? -(edge - y) / 4 : y > window.innerHeight - edge ? (y - (window.innerHeight - edge)) / 4 : 0;
+      if (!speed) return;
+      const sc = scroller();
+      if (sc) sc.scrollBy(0, speed);
+      else window.scrollBy(0, speed);
+      follow();
+    }, 16);
+    window.addEventListener(`pointermove`, onMove);
+    window.addEventListener(`pointerup`, onUp);
+    window.addEventListener(`pointercancel`, onCancel);
+    window.addEventListener(`keydown`, onKey);
+    window.addEventListener(`touchmove`, blockScroll, { passive: false });
+    document.documentElement.classList.add(`is-dragging`);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(`pointermove`, onMove);
+      window.removeEventListener(`pointerup`, onUp);
+      window.removeEventListener(`pointercancel`, onCancel);
+      window.removeEventListener(`keydown`, onKey);
+      window.removeEventListener(`touchmove`, blockScroll);
+      document.documentElement.classList.remove(`is-dragging`);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDragging]);
+
+  // Sections fold to their headers while dragging; keep the grabbed one under the pointer.
+  const dragId = drag?.id;
+  useLayoutEffect(() => {
+    if (!dragId) return;
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-section-id="${dragId}"]`);
+    const y = dragRef.current?.y;
+    if (!el || y === undefined) return;
+    const delta = el.getBoundingClientRect().top + 24 - y;
+    const sc = scroller();
+    if (sc) sc.scrollBy(0, delta);
+    else window.scrollBy(0, delta);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragId]);
 
   // Ctrl/Cmd+S saves.
   useEffect(() => {
@@ -321,8 +479,11 @@ export function SongEditor({ songId }: { songId: string | null }) {
   const keyIndex = noteIndex(draft.key);
   const previewCtx = { songKey: keyIndex, playKey: keyIndex, scaleId: draft.scaleId, songCapo: draft.capo, capo: draft.capo, display: `sounding` as const };
 
+  // Sections other than the one being dragged; drop positions are indexes into this list.
+  const others = drag ? draft.sections.filter((x) => x.id !== drag.id) : draft.sections;
+
   const editor = (
-    <div className="song-editor__form">
+    <div className={`song-editor__form${drag ? ` song-editor__form--dragging` : ``}`}>
       <fieldset className="card song-editor__details">
         <Field label="Song name" wide>
           <input className="input" value={draft.title} onChange={(e) => set(`title`, e.target.value)} placeholder="Song name" autoFocus={!stored} />
@@ -383,14 +544,27 @@ export function SongEditor({ songId }: { songId: string | null }) {
             placeholder="—"
           />
         </Field>
+        <Field label="Time">
+          <select className="input" value={draft.timeSignature} onChange={(e) => set(`timeSignature`, e.target.value)}>
+            {TIME_SIGNATURES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Song notes" wide>
           <textarea className="input" rows={2} value={draft.notes} onChange={(e) => set(`notes`, e.target.value)} placeholder="Feel, arrangement, who starts…" />
         </Field>
       </fieldset>
 
-      {draft.sections.map((section, i) => (
-        <SectionEditor
-          key={section.id}
+      <div className="song-editor__sections" ref={listRef}>
+        {draft.sections.map((section, i) => (
+          <div key={section.id} className="song-editor__slot">
+            {drag && drag.id !== section.id && drag.target === others.findIndex((x) => x.id === section.id) && <div className="drop-line" aria-hidden />}
+            <SectionEditor
+          dragging={drag?.id === section.id}
+          onDragStart={(e) => pressSection(section.id, e)}
           section={section}
           song={draft}
           index={i}
@@ -407,13 +581,16 @@ export function SongEditor({ songId }: { songId: string | null }) {
             setSections(next);
           }}
           onDelete={() => confirm(`Delete “${section.label}”?`) && setSections(draft.sections.filter((x) => x.id !== section.id))}
-        />
-      ))}
+            />
+          </div>
+        ))}
+        {drag && drag.target === others.length && <div className="drop-line" aria-hidden />}
+      </div>
 
       <div className="card add-section">
         <span className="field__label">Add section</span>
         <div className="add-section__buttons">
-          {SECTION_TYPES.map((t) => (
+          {SECTION_TYPES.filter((t) => t.id !== `custom`).map((t) => (
             <button
               key={t.id}
               type="button"
@@ -424,6 +601,27 @@ export function SongEditor({ songId }: { songId: string | null }) {
             </button>
           ))}
         </div>
+        <form
+          className="add-section__custom"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const name = customName.trim();
+            if (!name) return;
+            setSections([...draft.sections, createSection(`custom`, name)]);
+            setCustomName(``);
+          }}
+        >
+          <input
+            className="input input--compact"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            placeholder="Your own section name, e.g. Tag, Solo, Breakdown"
+            aria-label="Custom section name"
+          />
+          <button type="submit" className="btn btn--small" disabled={!customName.trim()}>
+            + Add custom
+          </button>
+        </form>
       </div>
     </div>
   );

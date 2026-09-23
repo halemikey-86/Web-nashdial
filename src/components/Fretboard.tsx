@@ -4,6 +4,7 @@ import { displayNote } from '../music/notes';
 import { nashvilleLabels } from '../music/scales';
 import { PIECE_CELLS, PIECE_INFO, PIECE_ORDER, findPieces, pieceMap, type Piece, type PieceType } from '../music/tetrisShapes';
 import type { Tuning } from '../music/tunings';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { Neck, NeckMarker } from './Neck';
 import { fretCount, neckFor } from './neckGeometry';
 
@@ -181,8 +182,10 @@ function GridBoard({ rows, tuning, capoFret, view, label, pieceAt, visible }: Bo
 
 function NeckBoard({ rows, tuning, capoFret, view, label, pieceAt, visible }: BoardProps) {
   const count = tuning.strings.length;
+  // Phones: stand the whole neck upright so every fret fits the screen width.
+  const upright = useMediaQuery(`(max-width: 599px)`);
   return (
-    <Neck stringCount={count} capo={capoFret} className="fretboard__neck" label="Scale notes on the neck">
+    <Neck stringCount={count} capo={capoFret} vertical={upright} className="fretboard__neck" label="Scale notes on the neck">
       {rows.flatMap((cells, s) =>
         cells.map((cell) => {
           if (!cell.inScale || (capoFret > 0 && cell.fret < capoFret)) return null;

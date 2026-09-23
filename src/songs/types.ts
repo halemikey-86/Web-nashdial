@@ -9,9 +9,11 @@ export const SECTION_TYPES = [
   { id: `chorus`, label: `Chorus` },
   { id: `refrain`, label: `Refrain` },
   { id: `bridge`, label: `Bridge` },
+  { id: `interlude`, label: `Interlude` },
   { id: `vamp`, label: `Vamp` },
   { id: `epic-chorus`, label: `Epic Chorus` },
   { id: `outro`, label: `Outro` },
+  { id: `custom`, label: `Custom` },
 ] as const;
 
 export type SectionType = (typeof SECTION_TYPES)[number]['id'];
@@ -58,6 +60,8 @@ export interface Section {
   /** Note names, e.g. "B3 D4 G4 | A3". */
   singleNotes: string;
   notes: string;
+  /** Length in bars, for the drum view. null = estimate from the chord chart. */
+  bars: number | null;
 }
 
 export interface Song {
@@ -72,6 +76,8 @@ export interface Song {
   /** Capo the tabs and chords were written with. */
   capo: number;
   bpm: number | null;
+  /** e.g. "4/4", "6/8". */
+  timeSignature: string;
   notes: string;
   sections: Section[];
   createdAt: string;

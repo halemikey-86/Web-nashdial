@@ -7,6 +7,8 @@ import { loadTheme } from './themes';
 import './styles/app.css';
 import './styles/songs.css';
 import './styles/neck.css';
+import './styles/drums.css';
+import './styles/tuner.css';
 
 document.documentElement.dataset.theme = loadTheme();
 

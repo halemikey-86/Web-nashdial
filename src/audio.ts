@@ -21,14 +21,18 @@ const midiHz = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
 
 /** A short plucked-string sound. */
 export function pluck(midi: number, delay = 0, gain = 0.22): void {
+  pluckHz(midiHz(midi), delay, gain);
+}
+
+/** A plucked-string sound at an exact frequency (e.g. a tuner reference tone). */
+export function pluckHz(hz: number, delay = 0, gain = 0.22, length = 1.4): void {
   const ac = running();
   if (!ac) return;
   const t = ac.currentTime + delay;
-  const hz = midiHz(midi);
   const out = ac.createGain();
   out.gain.setValueAtTime(0.0001, t);
   out.gain.exponentialRampToValueAtTime(gain, t + 0.006);
-  out.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + length);
   const filter = ac.createBiquadFilter();
   filter.type = `lowpass`;
   filter.frequency.setValueAtTime(Math.min(9000, hz * 8), t);
@@ -43,7 +47,7 @@ export function pluck(midi: number, delay = 0, gain = 0.22): void {
     g.gain.value = level;
     osc.connect(g).connect(filter);
     osc.start(t);
-    osc.stop(t + 1.5);
+    osc.stop(t + length + 0.1);
   }
 }
 
@@ -52,11 +56,26 @@ export function strum(midis: number[], gain = 0.14): void {
   [...midis].sort((a, b) => a - b).forEach((m, i) => pluck(m, i * 0.022, gain));
 }
 
-/** Metronome tick; accented on the first beat of a bar. */
-export function click(accent = false): void {
+/**
+ * A clock to keep for a whole run: the audio clock when sound is running (so clicks can be
+ * scheduled ahead precisely), otherwise the page clock.
+ */
+export function pickClock(): { now: () => number; audio: boolean } {
+  const ac = running();
+  return ac ? { now: () => ac.currentTime, audio: true } : { now: () => performance.now() / 1000, audio: false };
+}
+
+/** Seconds on the audio clock (or the page clock when there is no audio). */
+export function audioNow(): number {
+  const ac = running();
+  return ac ? ac.currentTime : performance.now() / 1000;
+}
+
+/** Metronome tick; accented on the first beat of a bar. `when` is an audioNow() time. */
+export function click(accent = false, when?: number): void {
   const ac = running();
   if (!ac) return;
-  const t = ac.currentTime;
+  const t = Math.max(ac.currentTime, when ?? ac.currentTime);
   const osc = ac.createOscillator();
   const g = ac.createGain();
   osc.type = `square`;

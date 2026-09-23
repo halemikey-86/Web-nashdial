@@ -64,8 +64,14 @@ function ExercisePlayer({ exercise }: { exercise: Exercise }) {
   const current = exercise.steps[index];
   const hand = states[index];
   const frets = exercise.steps.map((s) => s.f);
-  const from = Math.max(0, Math.min(...frets) - 1);
-  const to = Math.max(...frets) + 1;
+  const phone = useMediaQuery(`(max-width: 599px)`);
+  const lowest = Math.min(...frets);
+  const highest = Math.max(...frets);
+  // On a phone, long exercises show a 6-fret window that follows the hand, so fingers stay big.
+  const follow = phone && highest - lowest > 5;
+  const handPos = current.f - (current.finger - 1);
+  const from = follow ? Math.max(0, Math.min(handPos - 1, highest - 5)) : Math.max(0, lowest - 1);
+  const to = follow ? Math.min(highest, from + 5) : highest;
 
   useEffect(() => {
     setIndex(0);

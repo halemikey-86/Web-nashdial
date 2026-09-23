@@ -17,6 +17,38 @@ import {
   type Technique,
 } from './types';
 
+export const TIME_SIGNATURES = [`4/4`, `3/4`, `6/8`, `2/4`, `5/4`, `7/8`, `12/8`];
+
+export function beatsPerBar(timeSignature: string): number {
+  const n = Number.parseInt(timeSignature, 10);
+  return Number.isFinite(n) && n > 0 ? n : 4;
+}
+
+/**
+ * Bars in a section: the explicit count if set, otherwise an estimate from the chord chart
+ * (one bar per "|"-separated measure, or one bar per chord), then from the tab's measures.
+ */
+export function sectionBars(section: Pick<Section, 'bars' | 'chords' | 'tabs'>): { bars: number; estimated: boolean } {
+  if (section.bars) return { bars: section.bars, estimated: false };
+  const text = section.chords.trim();
+  if (text) {
+    if (text.includes(`|`)) {
+      const measures = text
+        .split(`\n`)
+        .flatMap((l) => l.split(`|`))
+        .filter((m) => m.trim()).length;
+      if (measures) return { bars: measures, estimated: true };
+    }
+    const chords = text.split(/\s+/).filter((t) => /^[(\[]?[A-G]/.test(t)).length;
+    if (chords) return { bars: chords, estimated: true };
+  }
+  const tabMeasures = Math.max(
+    0,
+    ...section.tabs.map((t) => t.steps.reduce((n, s, i) => n + (s === `|` && i > 0 ? 1 : 0), 1)),
+  );
+  return { bars: tabMeasures || 4, estimated: true };
+}
+
 export function newId(): string {
   if (typeof crypto !== `undefined` && `randomUUID` in crypto) return crypto.randomUUID();
   return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -44,7 +76,7 @@ export function nextSectionLabel(sections: Section[], type: SectionType): string
 }
 
 export function createSection(type: SectionType, label: string): Section {
-  return { id: newId(), type, label, chords: ``, tabs: [], singleNotes: ``, notes: `` };
+  return { id: newId(), type, label, chords: ``, tabs: [], singleNotes: ``, notes: ``, bars: null };
 }
 
 export function createSong(): Song {
@@ -59,6 +91,7 @@ export function createSong(): Song {
     tuningId: `standard`,
     capo: 0,
     bpm: null,
+    timeSignature: `4/4`,
     notes: ``,
     sections: [createSection(`intro`, `Intro`), createSection(`verse`, `Verse`), createSection(`chorus`, `Chorus`)],
     createdAt: t,
@@ -103,7 +136,7 @@ const clampInt = (v: unknown, min: number, max: number, fallback: number): numbe
 
 function normalizeSectionType(v: unknown): SectionType {
   const s = str(v).toLowerCase().replace(/[\s_]+/g, `-`).replace(`pre-chorus`, `prechorus`);
-  return (SECTION_TYPES.find((t) => t.id === s)?.id ?? `verse`) as SectionType;
+  return (SECTION_TYPES.find((t) => t.id === s)?.id ?? `custom`) as SectionType;
 }
 
 function normalizeCell(v: unknown): TabCell | null {
@@ -149,11 +182,13 @@ function normalizeSection(v: unknown, stringCount: number): Section | null {
   return {
     id: str(v.id) || newId(),
     type,
-    label: str(pick(v, `label`, `name`)) || sectionTypeLabel(type),
+    // An unknown type ("Solo", "Tag"…) becomes a custom section that keeps its name.
+    label: str(pick(v, `label`, `name`)) || (type === `custom` && str(v.type) ? str(v.type) : sectionTypeLabel(type)),
     chords: joinLines(v.chords),
     tabs,
     singleNotes: joinLines(pick(v, `singleNotes`, `single_notes`, `notes_single`)),
     notes: joinLines(v.notes),
+    bars: v.bars === null || v.bars === undefined || v.bars === `` ? null : clampInt(v.bars, 1, 256, 4),
   };
 }
 
@@ -174,6 +209,7 @@ export function normalizeSong(v: unknown): Song | null {
     tuningId: tuning.id,
     capo: clampInt(v.capo, 0, 12, 0),
     bpm: v.bpm === null || v.bpm === undefined || v.bpm === `` ? null : clampInt(v.bpm, 20, 400, 120),
+    timeSignature: TIME_SIGNATURES.includes(str(pick(v, `timeSignature`, `time`))) ? str(pick(v, `timeSignature`, `time`)) : `4/4`,
     notes: str(v.notes),
     sections: Array.isArray(v.sections)
       ? v.sections.map((s) => normalizeSection(s, stringCount)).filter((s): s is Section => s !== null)

@@ -1,0 +1,279 @@
+/* ==========================================================================
+   Tuner, and the Live view's whole-song overview.
+   ========================================================================== */
+
+/* ---------- Tuner ---------- */
+
+.tuner__main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tuner__display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  color: var(--theme-text);
+}
+.tuner__note {
+  font-family: 'Orbitron', var(--sheet-mono);
+  font-size: clamp(3rem, 12vw, 5rem);
+  font-weight: 700;
+  line-height: 1;
+}
+.tuner__display--good .tuner__note {
+  color: #2e9e40;
+  text-shadow: 0 0 18px #35b84a88;
+}
+.tuner__hz {
+  color: var(--theme-text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.tuner__gauge {
+  position: relative;
+  width: min(100%, 520px);
+  height: 64px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e8283c33, transparent 35%, transparent 65%, #e8283c33);
+  box-shadow: inset 0 0 0 1px var(--theme-control-border);
+}
+.tuner__scale span {
+  position: absolute;
+  bottom: 4px;
+  color: var(--theme-text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+.tuner__zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 5%);
+  width: 10%;
+  background: #35b84a44;
+}
+.tuner__needle {
+  position: absolute;
+  top: 6px;
+  bottom: 18px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--theme-accent);
+  box-shadow: 0 0 6px var(--theme-accent);
+  transition: left 0.08s linear;
+}
+.tuner__display--good .tuner__needle {
+  background: #35b84a;
+  box-shadow: 0 0 10px #35b84a;
+}
+.tuner__verdict {
+  min-height: 1.4em;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.tuner__controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.tuner__error {
+  margin: 0;
+  color: var(--theme-accent);
+  font-weight: 700;
+  text-align: center;
+}
+.tuner__setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tuner__preset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+}
+.tuner__strings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tuner__string {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 58px auto;
+  gap: 6px;
+  align-items: center;
+  padding: 4px;
+  border: 1px solid var(--theme-control-border);
+  border-radius: 6px;
+  background: var(--theme-control-bg);
+}
+.tuner__string-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--theme-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tuner__string-num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--theme-text);
+  color: var(--theme-panel-base);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.tuner__string-note {
+  font-family: 'Orbitron', var(--sheet-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.tuner__string-hz {
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+}
+.tuner__check {
+  margin-left: auto;
+  color: #2e9e40;
+  font-weight: 900;
+}
+.tuner__string--selected {
+  box-shadow: 0 0 0 2px var(--theme-accent);
+}
+.tuner__string--active {
+  background: color-mix(in srgb, var(--theme-accent) 14%, var(--theme-control-bg));
+}
+.tuner__string--done .tuner__string-num {
+  background: #35b84a;
+  color: #fff;
+}
+.tuner__string-count {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+@media (width<600px) {
+  .tuner__string {
+    grid-template-columns: minmax(0, 1fr) 64px 52px;
+  }
+  .tuner__string .btn {
+    grid-column: 1 / -1;
+  }
+}
+@media (width>=960px) {
+  .tuner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-content: start;
+    gap: 12px;
+  }
+  .tuner .page-header {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Six items in the phone tab bar. */
+@media (width<600px) {
+  .mode-nav__btn {
+    font-size: 0.55rem;
+    letter-spacing: 0;
+  }
+  .mode-nav__icon {
+    font-size: 1.05rem;
+  }
+}
+@media (width>=960px) and (width<1280px) {
+  .mode-nav__btn {
+    padding: 6px 9px;
+    font-size: 0.66rem;
+  }
+}
+
+/* ---------- Live view: whole song in columns ---------- */
+
+.live__overview {
+  --s: 0.78;
+  column-width: 300px;
+  column-gap: 12px;
+  padding-top: 6px;
+  border-top: 1px solid var(--theme-control-border);
+}
+.live-part {
+  display: block;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-left: 4px solid var(--section-color);
+  border-radius: 4px;
+  background: var(--theme-control-bg);
+  break-inside: avoid;
+  cursor: pointer;
+}
+.live-part--now {
+  box-shadow: 0 0 0 2px var(--section-color);
+  cursor: default;
+}
+.live-part__label {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.live-part__chords {
+  margin: 0 0 4px;
+  overflow-x: auto;
+  font-family: var(--sheet-mono);
+  font-size: 0.9rem;
+  font-weight: 800;
+  white-space: pre-wrap;
+}
+.live-part__notes {
+  margin: 4px 0 0;
+  color: var(--theme-text-muted);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+.live-part .tab-display__measure {
+  font-size: 0.74rem;
+}
+.tab-display__now {
+  border-radius: 2px;
+  background: var(--theme-accent);
+  color: #fff;
+}
+
+/* Phones: the Dial screen's guitar/bass neck stands upright, full length. */
+.fretboard__neck.neck--vertical .neck__svg {
+  width: min(100%, 340px);
+  height: auto;
+}
+
+/* Phones: cropped necks (warm-up, Live) shrink to the screen so every finger is visible. */
+@media (width<600px) {
+  .ex-player__neck .neck__svg,
+  .live__neck .neck__svg {
+    min-width: 0;
+  }
+  .ex-player {
+    padding: 10px;
+  }
+}

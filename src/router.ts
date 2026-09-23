@@ -8,7 +8,9 @@ export type Route =
   | { name: 'sets' }
   | { name: 'set'; id: string }
   | { name: 'set-play'; id: string; index: number }
-  | { name: 'warmup'; id: string | null };
+  | { name: 'warmup'; id: string | null }
+  | { name: 'drums' }
+  | { name: 'tuner' };
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, ``).split(`/`).filter(Boolean).map(decodeURIComponent);
@@ -25,6 +27,8 @@ export function parseHash(hash: string): Route {
     return { name: `set`, id: b };
   }
   if (a === `warmup`) return { name: `warmup`, id: b ?? null };
+  if (a === `drums`) return { name: `drums` };
+  if (a === `tuner`) return { name: `tuner` };
   return { name: `dial` };
 }
 
@@ -46,6 +50,10 @@ export function routeHash(route: Route): string {
       return `#/sets/${encodeURIComponent(route.id)}/play/${route.index}`;
     case `warmup`:
       return route.id ? `#/warmup/${encodeURIComponent(route.id)}` : `#/warmup`;
+    case `drums`:
+      return `#/drums`;
+    case `tuner`:
+      return `#/tuner`;
   }
 }
 

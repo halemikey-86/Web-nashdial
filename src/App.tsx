@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChordShapes } from './components/ChordShapes';
 import { CapoGuide } from './components/CapoGuide';
 import { Fretboard, type FretboardBoard, type FretboardLabels, type FretboardView } from './components/Fretboard';
@@ -6,6 +6,8 @@ import { TheoryPanel } from './components/TheoryPanel';
 import { PIECE_ORDER, type PieceType } from './music/tetrisShapes';
 import { loadPref, savePref } from './songs/storage';
 import { WarmUp } from './warmup/WarmUp';
+import { DrumsHome, DrumsticksIcon } from './songs/DrumView';
+import { Tuner, TuningForkIcon } from './tuner/Tuner';
 import { KeyDial } from './components/KeyDial';
 import { CapoSelector, InstrumentSelector, NashvilleNumbers, ScaleSelector, TuningSelector, ViewTabs } from './components/Selectors';
 import { ThemeJack } from './components/ThemeJack';
@@ -21,7 +23,7 @@ import { SetPlay, SongView, type OpenInDial } from './songs/StageRoutes';
 import { getTheme, loadTheme, saveTheme } from './themes';
 
 type MainView = 'fretboard' | 'chords' | 'theory';
-type Mode = 'dial' | 'songs' | 'sets' | 'warmup';
+type Mode = 'dial' | 'songs' | 'sets' | 'drums' | 'warmup' | 'tuner';
 
 const VIEW_OPTIONS: { id: MainView; label: string }[] = [
   { id: `fretboard`, label: `Fretboard` },
@@ -29,16 +31,20 @@ const VIEW_OPTIONS: { id: MainView; label: string }[] = [
   { id: `theory`, label: `Theory` },
 ];
 
-const MODES: { id: Mode; label: string; icon: string; route: Route }[] = [
+const MODES: { id: Mode; label: string; icon: ReactNode; route: Route }[] = [
   { id: `dial`, label: `Dial`, icon: `◎`, route: { name: `dial` } },
   { id: `songs`, label: `Songs`, icon: `♫`, route: { name: `songs` } },
   { id: `sets`, label: `Setlists`, icon: `☰`, route: { name: `sets` } },
+  { id: `drums`, label: `Drums`, icon: <DrumsticksIcon size={18} />, route: { name: `drums` } },
   { id: `warmup`, label: `Warm-up`, icon: `✋︎`, route: { name: `warmup`, id: null } },
+  { id: `tuner`, label: `Tuner`, icon: <TuningForkIcon size={18} />, route: { name: `tuner` } },
 ];
 
 function modeOf(route: Route): Mode {
   if (route.name === `dial`) return `dial`;
   if (route.name === `warmup`) return `warmup`;
+  if (route.name === `drums`) return `drums`;
+  if (route.name === `tuner`) return `tuner`;
   if (route.name.startsWith(`song`)) return `songs`;
   return `sets`;
 }
@@ -204,6 +210,12 @@ export function App() {
       break;
     case `warmup`:
       content = <WarmUp exerciseId={route.id} />;
+      break;
+    case `drums`:
+      content = <DrumsHome />;
+      break;
+    case `tuner`:
+      content = <Tuner />;
       break;
   }
 

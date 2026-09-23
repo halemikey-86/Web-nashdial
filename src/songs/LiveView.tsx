@@ -8,8 +8,8 @@ import { CAGED, resolveShape, type CagedShape, type ResolvedShape } from '../mus
 import { noteAt } from '../music/notes';
 import { getTuning, openStringMidi, type Tuning } from '../music/tunings';
 import { loadPref, savePref } from './storage';
-import { parseNote, transposeChord, transposeTabBlock, type TransposeContext } from './songTranspose';
-import { cellText, hasTabContent } from './TabDisplay';
+import { parseNote, transposeChord, transposeChordText, transposeTabBlock, type TransposeContext } from './songTranspose';
+import { TabDisplay, cellText, hasTabContent } from './TabDisplay';
 import { stringLabels } from './tabStrings';
 import type { Section, Song, TabColumn } from './types';
 
@@ -131,6 +131,7 @@ function TabPlayer({
   settings,
   autoStart,
   onEnd,
+  onIndex,
 }: {
   columns: { col: TabColumn; barBefore: boolean }[];
   capo: number;
@@ -138,6 +139,8 @@ function TabPlayer({
   settings: PlayerSettings;
   autoStart: boolean;
   onEnd: () => void;
+  /** Reports the current step so the whole-song overview can highlight it. */
+  onIndex?: (i: number) => void;
 }) {
   const count = tuning.strings.length;
   const labels = stringLabels(tuning);
@@ -163,6 +166,7 @@ function TabPlayer({
   const to = Math.min(fretCount(neckFor(count)), Math.max(from + 5, ...(all.length ? all.map((f) => f + 1) : [from + 5])));
 
   useEffect(() => {
+    onIndex?.(index);
     if (settings.sound) now.forEach((n) => pluck(midi[n.string] + n.fret, 0, 0.2));
     const el = stripRef.current?.querySelector<HTMLElement>(`[data-i="${index}"]`);
     const box = stripRef.current;
@@ -328,6 +332,8 @@ export function LiveView({ song, ctx }: { song: Song; ctx: TransposeContext }) {
   const [perBeat, setPerBeatState] = useState(() => loadPref<number>(`live-per-beat`, 2));
   const [loop, setLoop] = useState(false);
   const [sound, setSoundState] = useState(() => loadPref<string>(`live-sound`, `on`) === `on`);
+  const [step, setStep] = useState(0);
+  const labels = stringLabels(tuning);
 
   const settings: PlayerSettings = {
     bpm,
@@ -425,11 +431,46 @@ export function LiveView({ song, ctx }: { song: Song; ctx: TransposeContext }) {
       </div>
 
       {effectiveMode === `tab` && tab ? (
-        <TabPlayer key={`${section.id}-${tab.id}`} columns={columns} capo={ctx.capo} tuning={tuning} settings={settings} autoStart={autoStart} onEnd={onEnd} />
+        <TabPlayer
+          key={`${section.id}-${tab.id}`}
+          columns={columns}
+          capo={ctx.capo}
+          tuning={tuning}
+          settings={settings}
+          autoStart={autoStart}
+          onEnd={onEnd}
+          onIndex={setStep}
+        />
       ) : (
         <ChordPlayer key={`${section.id}-chords`} chords={chords} capo={ctx.capo} tuning={tuning} settings={settings} autoStart={autoStart} onEnd={onEnd} />
       )}
       {section.notes.trim() && <p className="sheet-section__notes">{section.notes}</p>}
+
+      <div className="live__overview" aria-label="Whole song">
+        {sections.map((s, i) => (
+          <section
+            key={s.id}
+            className={`live-part sheet-section--${s.type}${i === sectionIdx ? ` live-part--now` : ``}`}
+            onClick={() => i !== sectionIdx && pick(i)}
+          >
+            <h4 className="live-part__label">{s.label}</h4>
+            {s.chords.trim() && <pre className="live-part__chords">{transposeChordText(s.chords.replace(/\s+$/, ``), ctx)}</pre>}
+            {s.tabs
+              .filter((t) => hasTabContent(t.steps))
+              .map((t) => (
+                <div key={t.id} className="live-part__tab">
+                  {t.label && <p className="sheet-section__sublabel">{t.label}</p>}
+                  <TabDisplay
+                    steps={transposeTabBlock(t, ctx).steps}
+                    stringLabels={labels}
+                    highlight={i === sectionIdx && effectiveMode === `tab` && t.id === tab?.id ? step : undefined}
+                  />
+                </div>
+              ))}
+            {s.notes.trim() && <p className="live-part__notes">{s.notes}</p>}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
