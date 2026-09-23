@@ -881,8 +881,10 @@ text.neck-marker--mute {
   align-items: center;
   min-width: 34px;
   padding: 4px;
+  border: 1px solid var(--theme-control-border);
   border-radius: 4px;
-  background: var(--theme-tab-active);
+  background: var(--theme-control-bg);
+  color: var(--theme-text);
 }
 .theory__note--root {
   box-shadow: inset 0 0 0 2px var(--theme-accent);
@@ -997,4 +999,14 @@ text.neck-marker--mute {
     height: max(260px, calc(100dvh - 590px));
     max-width: none;
   }
+}
+
+/* The orange theme's active colour is near-black, so text on it must be white. */
+[data-theme='orange'] .live__chord--now,
+[data-theme='orange'] .capo-guide__option--on,
+[data-theme='orange'] .tab-editor__cell--active,
+[data-theme='orange'] .tab-key--on,
+[data-theme='orange'] .tab-key:active,
+[data-theme='orange'] .picker__row:has(input:checked) {
+  color: #fff;
 }
