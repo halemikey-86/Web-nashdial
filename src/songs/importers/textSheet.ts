@@ -27,11 +27,15 @@ const SECTION_WORDS: [RegExp, SectionType][] = [
 ];
 
 const HEADER_RE =
-  /^\s*[[(]?\s*((?:intro|verse|pre[\s-]?chorus|chorus|hook|refrain|bridge|interlude|instrumental|vamp|outro|ending|coda|tag|solo|breakdown|turnaround|riff|break)\b[^\])]*?)\s*[\])]?\s*:?\s*(?:x\s*\d+)?\s*$/i;
+  /^\s*(?:[A-Z][a-z0-9]?\d?\s+(?=[A-Za-z]))?[[(]?\s*((?:intro|verse|pre[\s-]?chorus|post[\s-]?chorus|chorus|hook|refrain|bridge|interlude|instrumental|vamp|outro|ending|coda|tag|solo|breakdown|turnaround|riff|break)(?:\s*(?:\d+[a-z]?|[a-d]|part\s*\d+))?)\s*[\])]?\s*:?\s*(?:\(?\s*x\s*\d+\s*\)?|\d+x)?\s*$/i;
 const BRACKET_HEADER_RE = /^\s*\[([^\]]{1,40})\]\s*$/;
 const META_RE = /^\s*(title|song|artist|by|composer|key|capo|tempo|bpm|time|time signature)\s*[:=-]\s*(.+?)\s*$/i;
 const TAB_LINE_RE = /^\s*([a-gA-G][#b]?)?\s*[|:]?[-0-9hpbr/\\~x|*.()]{6,}\s*$/;
-const JUNK_RE = /(ccli|©|\(c\)\s*\d{4}|copyright|all rights reserved|www\.|https?:\/\/|songselect|used by permission|^page\s+\d+(\s+of\s+\d+)?$|^\d+\s*\/\s*\d+$)/i;
+const JUNK_RE =
+  /(ccli|©|℗|\(c\)\s*\d{4}|copyright|all rights reserved|www\.|https?:\/\/|songselect|multitracks|used by permission|^writers?:|mtid:|^page:?\s*\d+(\s*(of|\/)\s*\d+)?$|^\d+\s*\/\s*\d+$|^\d{1,2}$|^charts?$)/i;
+/** A chart's roadmap line: only section badges, e.g. "V1 Vp C1 C2 Po Rf V2 …". */
+const ROADMAP_RE = /^(?:[A-Z][A-Za-z0-9]{0,2}\s+){3,}[A-Z][A-Za-z0-9]{0,2}\d?$/;
+const PAGE_MARK_RE = /\s*page:?\s*\d+\s*(?:of|\/)\s*\d+\s*/i;
 
 export function sectionTypeFor(label: string): SectionType {
   const t = label.trim();
@@ -104,12 +108,23 @@ interface Draft {
   chords: string[];
   notes: string[];
   tabs: TabStep[][];
+  /** Set once a chord line arrives: lyrics after it stay in the chart, under their chords. */
+  chart?: boolean;
 }
 
 function toSection(d: Draft): Section {
   const s = createSection(d.type, d.label);
-  s.chords = d.chords.join(`\n`).replace(/\n+$/, ``);
-  s.notes = d.notes.join(`\n`).replace(/\n{3,}/g, `\n\n`).trim();
+  // Drop indentation shared by every chart line (a right-hand PDF column), keeping chords over their words.
+  const indent = Math.min(...d.chords.filter((l) => l.trim()).map((l) => /^ */.exec(l)![0].length));
+  s.chords = d.chords
+    .map((l) => l.slice(Number.isFinite(indent) ? indent : 0))
+    .join(`\n`)
+    .replace(/\n+$/, ``);
+  s.notes = d.notes
+    .map((l) => l.trim())
+    .join(`\n`)
+    .replace(/\n{3,}/g, `\n\n`)
+    .trim();
   s.tabs = d.tabs.map((steps) => ({ ...createTabBlock(6), id: newId(), steps }));
   return s;
 }
@@ -209,19 +224,28 @@ export function parseChordSheet(text: string, fallbackTitle = ``): Song {
     if (!trimmed) {
       const c = current as Draft | null;
       if (c) {
-        if (c.chords.length && !c.notes.length) {
+        if (c.chart) {
           if (c.chords[c.chords.length - 1] !== ``) c.chords.push(``);
         } else c.notes.push(``);
       }
       continue;
     }
 
-    // Page furniture from printed charts (CCLI, copyright, URLs, page numbers).
-    if (JUNK_RE.test(trimmed)) continue;
+    // Page furniture from printed charts (CCLI, copyright, URLs, page numbers, roadmap, repeated title).
+    if (JUNK_RE.test(trimmed) || (ROADMAP_RE.test(trimmed) && !isChordLine(trimmed))) continue;
+    if (song.title && current && trimmed === song.title) continue;
+    if (PAGE_MARK_RE.test(trimmed)) {
+      const without = line.replace(PAGE_MARK_RE, ` `).trimEnd();
+      if (!without.trim()) continue;
+      lines[i] = without;
+      i--;
+      continue;
+    }
     // "Key - G | Tempo - 72 | Time - 4/4" on one line.
-    if (!current && /\b(key|tempo|bpm|time|capo)\s*[:=-]/i.test(trimmed) && /[|•·]/.test(trimmed)) {
+    const metaCount = (trimmed.match(/\b(key|tempo|bpm|time|capo)\s*[:=-]/gi) ?? []).length;
+    if (!current && metaCount > 0 && (metaCount > 1 || /[|•·]/.test(trimmed))) {
       let any = false;
-      for (const part of trimmed.split(/\s*[|•·]\s*/)) {
+      for (const part of trimmed.split(/\s*[|•·]\s*|\s+(?=\b(?:key|tempo|bpm|time|capo)\s*[:=-])/i)) {
         const m = META_RE.exec(part);
         if (m && applyMeta(song, m[1], m[2])) {
           any = true;
@@ -237,6 +261,12 @@ export function parseChordSheet(text: string, fallbackTitle = ``): Song {
     }
 
     const header = HEADER_RE.exec(trimmed) ?? (BRACKET_HEADER_RE.test(trimmed) && !isChordLine(trimmed.replace(/[[\]]/g, ``)) ? BRACKET_HEADER_RE.exec(trimmed) : null);
+    // A far-indented "Breakdown" right under a heading is a cue for that section, not a new one.
+    const c = current as Draft | null;
+    if (header && c && !c.chords.length && !c.tabs.length && /^\s{24,}/.test(line)) {
+      c.notes.push(trimmed);
+      continue;
+    }
     if (header) {
       let label = header[1].replace(/\s+/g, ` `).replace(/:$/, ``).trim();
       if (label === label.toUpperCase()) label = label.toLowerCase();
@@ -258,11 +288,14 @@ export function parseChordSheet(text: string, fallbackTitle = ``): Song {
     }
 
     if (isChordLine(line)) {
-      ensure().chords.push(line.replace(/\s+$/, ``));
+      const d = ensure();
+      d.chords.push(line.replace(/\s+$/, ``));
+      d.chart = true;
       continue;
     }
-    // A lyric right under a chord line stays with it in the chart, keeping chords over their words.
-    if (current && (current as Draft).chords.length && !(current as Draft).notes.length) {
+    // Lyrics after the first chord line stay in the chart, keeping chords over their words.
+    // (Cues before it, like "Piano softly in", go to notes.)
+    if (current && (current as Draft).chart) {
       (current as Draft).chords.push(line.replace(/\s+$/, ``));
       continue;
     }

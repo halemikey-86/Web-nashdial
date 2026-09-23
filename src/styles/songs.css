@@ -590,6 +590,12 @@ fieldset.card {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* The bar-line button sits apart from the chords so it never reads as one. */
+.chip-btn--bar {
+  margin-left: 8px;
+  border-style: dashed;
+  opacity: 0.85;
+}
 .add-section {
   display: flex;
   flex-direction: column;

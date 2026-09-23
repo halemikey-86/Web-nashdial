@@ -1,4 +1,7 @@
+import { noteIndex, prefersFlats } from '../../music/notes';
+import { scaleNotes } from '../../music/scales';
 import { parseImport, type ParsedImport } from '../io';
+import { normalizeKeyName } from '../songTranspose';
 import type { Song } from '../types';
 import { parseMusicXml } from './musicxml';
 import { parseChordSheet } from './textSheet';
@@ -61,17 +64,55 @@ interface PdfItem {
   str: string;
 }
 
-/** Group text items into lines, allowing a little vertical wobble (chords set slightly higher, mixed fonts). */
+/** Group text items into lines, allowing a little vertical wobble (superscripts, mixed fonts). */
 function toLines(items: PdfItem[]): PdfItem[][] {
   const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
-  const lines: { y: number; items: PdfItem[] }[] = [];
+  const lines: { y: number; h: number; items: PdfItem[] }[] = [];
   for (const it of sorted) {
-    const tol = Math.max(2, it.h * 0.35);
-    const line = lines.find((l) => Math.abs(l.y - it.y) <= tol);
-    if (line) line.items.push(it);
-    else lines.push({ y: it.y, items: [it] });
+    const line = lines.find((l) => Math.abs(l.y - it.y) <= Math.max(2, Math.max(l.h, it.h) * 0.35));
+    if (line) {
+      line.items.push(it);
+      line.h = Math.max(line.h, it.h);
+    } else lines.push({ y: it.y, h: it.h, items: [it] });
   }
   return lines.sort((a, b) => b.y - a.y).map((l) => l.items.sort((a, b) => a.x - b.x));
+}
+
+const CHORDISH = /^[A-G][#b♯♭]?[^\s]*$/;
+const CHORD_SUFFIX = /^(?:m(?:aj)?|min|sus|add|dim|aug|\+|°|ø|\d|\(|\)|#|b|♯|♭|\/[A-G])[^\s]*$/;
+
+/**
+ * Chart PDFs set chord extensions as raised, smaller text (the "7" in Dm7) and often draw ♭/♯ as a
+ * shape rather than a character, leaving only a gap. Join the pieces back into one chord and put the
+ * missing accidental back where the gap says it was.
+ */
+function mergeChordParts(line: PdfItem[], acc: string): { items: PdfItem[]; restored: number } {
+  const out: PdfItem[] = [];
+  let restored = 0;
+  for (const raw of line) {
+    if (!raw.str.trim()) continue;
+    const it = { ...raw, str: raw.str.trim() };
+    // The gap can also sit inside one item: "B m" for B♭m.
+    const inner = /^([A-G]) +((?:m(?:aj)?|min|sus|add|dim|aug|\d)\S*)$/.exec(it.str);
+    if (inner) {
+      it.str = inner[1] + acc + inner[2];
+      restored++;
+    }
+    const prev = out[out.length - 1];
+    if (prev && CHORDISH.test(prev.str) && CHORD_SUFFIX.test(it.str)) {
+      const gap = it.x - (prev.x + prev.w);
+      const raised = it.h < prev.h * 0.9 && it.y > prev.y + 0.3;
+      if (gap < prev.h * (raised ? 1 : 0.6)) {
+        const missing = /^[A-G]$/.test(prev.str) && gap > prev.h * 0.2;
+        if (missing) restored++;
+        prev.str += (missing ? acc : ``) + it.str;
+        prev.w = it.x + it.w - prev.x;
+        continue;
+      }
+    }
+    out.push(it);
+  }
+  return { items: out, restored };
 }
 
 /** Render lines as monospace text, placing each item by its x position so chords stay above their words. */
@@ -80,6 +121,7 @@ function linesToText(lines: PdfItem[][], left: number, charW: number): string[] 
   let lastY: number | null = null;
   let lastH = 12;
   for (const items of lines) {
+    if (!items.length) continue;
     const y = items[0].y;
     // A gap of well over one line means a blank line between blocks.
     if (lastY !== null && lastY - y > lastH * 1.9) out.push(``);
@@ -99,49 +141,114 @@ function linesToText(lines: PdfItem[][], left: number, charW: number): string[] 
   return out;
 }
 
+/** Split a line wherever there's a very wide gap (e.g. "Anne Wilson ······ Key: F  Tempo: 76"). */
+function splitWide(line: PdfItem[], charW: number): PdfItem[][] {
+  const parts: PdfItem[][] = [[]];
+  let prevEnd = -Infinity;
+  for (const it of line) {
+    if (parts[parts.length - 1].length && it.x - prevEnd > charW * 10) parts.push([]);
+    parts[parts.length - 1].push(it);
+    prevEnd = it.x + it.w;
+  }
+  return parts;
+}
+
+const SECTION_WORD = /^(?:[A-Z][A-Za-z0-9]{0,2}\s+)?(intro|verse|pre[\s-]?chorus|post[\s-]?chorus|chorus|refrain|bridge|interlude|instrumental|vamp|outro|ending|tag|solo|breakdown|turnaround)\b/i;
+
+const BADGE_HEADING = /^[A-Z][A-Za-z0-9]{0,2}\s+[A-Z]{3,}(?:[\s-][A-Z0-9]+)*$/;
+
 /**
  * Pull text out of a PDF so the chord-sheet parser can read it: keeps line breaks, keeps the spacing
- * that lines chords up over lyrics, and reads two-column pages left column first.
+ * that lines chords up over lyrics, reads two-column pages left column first, joins chord superscripts
+ * and restores accidentals that were drawn as shapes.
  */
-async function readPdfText(buf: ArrayBuffer): Promise<string> {
+export async function readPdfText(buf: ArrayBuffer): Promise<string> {
   const pdfjs = await import(`pdfjs-dist`);
   const { default: workerUrl } = await import(`pdfjs-dist/build/pdf.worker.min.mjs?url`);
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
-  const out: string[] = [];
+
+  // First pass: read every page's items.
+  const pages: { width: number; items: PdfItem[] }[] = [];
   for (let n = 1; n <= pdf.numPages; n++) {
     const page = await pdf.getPage(n);
     const width = page.getViewport({ scale: 1 }).width;
     const content = await page.getTextContent();
     const items: PdfItem[] = [];
     for (const raw of content.items) {
-      if (!(`str` in raw) || !raw.str) continue;
+      if (!(`str` in raw) || !raw.str.trim()) continue;
       const h = Math.abs(raw.transform[3]) || Math.abs(raw.height) || 10;
       items.push({ x: raw.transform[4], y: raw.transform[5], w: raw.width, h, str: raw.str });
     }
-    if (!items.some((i) => i.str.trim())) continue;
-    // Typical character width: median of (width / length) over text items.
+    pages.push({ width, items });
+  }
+
+  // The song's key decides whether a missing accidental is ♭ or ♯.
+  const allText = pages.flatMap((p) => p.items.map((i) => i.str)).join(` `);
+  const keyMatch = /key\s*[:=-]?\s*([A-G][#b♯♭]?)\s*(m(?!aj)|min)?/i.exec(allText);
+  const keyRoot = keyMatch ? normalizeKeyName(keyMatch[1]) : null;
+  const keyScale = keyMatch?.[2] ? `natural-minor` : `major`;
+  const acc = keyRoot && !prefersFlats(noteIndex(keyRoot), keyScale) && keyRoot !== `C` ? `♯` : `♭`;
+  const inKey = new Set(keyRoot ? scaleNotes(keyRoot, keyScale).map((n) => noteIndex(n)) : []);
+
+  const rendered: { lines: PdfItem[][]; left: number; charW: number }[] = [];
+  let restoredTotal = 0;
+  for (const { width, items } of pages) {
+    if (!items.length) continue;
     const widths = items.filter((i) => i.str.trim().length > 1).map((i) => i.w / i.str.length);
     const charW = widths.length ? widths.sort((a, b) => a - b)[Math.floor(widths.length / 2)] : 5;
 
-    // Two columns? Look for a vertical gap in the middle third that no text crosses.
+    // Header zone: everything above the first section heading is read full-width (title, key, roadmap).
+    const headingY = Math.max(-Infinity, ...items.filter((i) => (SECTION_WORD.test(i.str.trim()) || BADGE_HEADING.test(i.str.trim()))).map((i) => i.y));
+    const headerCut = Number.isFinite(headingY) ? headingY + 20 : Infinity;
+    const header = items.filter((i) => i.y > headerCut);
+    const body = items.filter((i) => i.y <= headerCut);
+
+    // Two columns? Find a vertical gap in the middle third that (almost) no body text crosses.
     let split: number | null = null;
-    const body = items.filter((i) => i.str.trim());
-    for (let x = width * 0.35; x <= width * 0.65; x += 4) {
-      const crossing = body.some((i) => i.x < x && i.x + i.w > x);
+    let best = Infinity;
+    for (let x = width * 0.35; x <= width * 0.65; x += 3) {
+      const crossing = body.filter((i) => i.x < x && i.x + i.w > x).length;
       const leftCount = body.filter((i) => i.x + i.w <= x).length;
       const rightCount = body.filter((i) => i.x >= x).length;
-      if (!crossing && leftCount > body.length * 0.2 && rightCount > body.length * 0.2) {
+      if (leftCount > body.length * 0.15 && rightCount > body.length * 0.15 && crossing <= Math.max(1, body.length * 0.02) && crossing < best) {
+        best = crossing;
         split = x;
-        break;
       }
     }
-    // Title/header lines that span the page (wide items above the columns) are read first.
-    const columns = split === null ? [body] : [body.filter((i) => i.x + i.w <= split!), body.filter((i) => i.x >= split!)];
-    for (const col of columns) {
-      const left = Math.min(...col.map((i) => i.x));
-      out.push(...linesToText(toLines(col), left, charW), ``);
+
+    const sections: PdfItem[][] = [header];
+    if (split === null) sections.push(body);
+    else sections.push(body.filter((i) => i.x + i.w / 2 < split!), body.filter((i) => i.x + i.w / 2 >= split!));
+    for (const [n, group] of sections.entries()) {
+      if (!group.length) continue;
+      const left = Math.min(...group.map((i) => i.x));
+      let lines = toLines(group).map((l) => {
+        const merged = mergeChordParts(l, acc);
+        restoredTotal += merged.restored;
+        return merged.items;
+      });
+      if (n === 0) lines = lines.flatMap((l) => splitWide(l, charW));
+      rendered.push({ lines, left, charW });
     }
+  }
+
+  // If the chart drops accidentals, a bare chord letter that isn't in the key but its flat/sharp is
+  // (B in F major → B♭) gets the accidental back too.
+  const out: string[] = [];
+  for (const { lines, left, charW } of rendered) {
+    const fixed = lines.map((line) => {
+      const chordLine = line.every((i) => CHORDISH.test(i.str) || /^[|/.%-]+$/.test(i.str));
+      if (!restoredTotal || !chordLine || !keyRoot) return line;
+      return line.map((i) => {
+        const m = /^([A-G])(\/[A-G][#b♯♭]?)?$/.exec(i.str);
+        if (!m) return i;
+        const pc = noteIndex(m[1]);
+        const shifted = (pc + (acc === `♭` ? 11 : 1)) % 12;
+        return !inKey.has(pc) && inKey.has(shifted) ? { ...i, str: `${m[1]}${acc}${m[2] ?? ``}` } : i;
+      });
+    });
+    out.push(...linesToText(fixed, left, charW), ``);
   }
   const text = out.join(`\n`);
   if (!text.trim()) throw new Error(`That PDF has no text to read (it may be a scanned image).`);

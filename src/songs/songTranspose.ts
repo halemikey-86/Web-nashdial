@@ -1,4 +1,5 @@
-import { mod12, noteIndex, prefersFlats, spellNote } from '../music/notes';
+import { isMinorFlavoured, mod12, noteAt, noteIndex, prefersFlats, spellNote } from '../music/notes';
+import { scaleNotes } from '../music/scales';
 import { signedInterval } from '../music/transpose';
 import type { TabBlock, TabStep } from './types';
 
@@ -45,11 +46,25 @@ export function semitoneShift(ctx: TransposeContext): number {
 const SUFFIX = `(?:maj|min|m|M|dim|aug|sus|add|no|alt|\\+|°|ø|Δ|\\d|\\(|\\)|#|b|♯|♭|,|-)*`;
 const CHORD_RE = new RegExp(`^([(\\[]?)([A-G])([#b♯♭]?)(${SUFFIX})(?:/([A-G])([#b♯♭]?))?([)\\],.*]*)$`);
 
-function renderRoot(index: number, ctx: TransposeContext): string {
+/** Is this pitch class one of the key's own notes (pentatonic/blues use their parent key)? */
+function inKey(note: number, key: number, scaleId: string): boolean {
+  const scale = scaleNotes(noteAt(key), scaleId).length >= 7 ? scaleId : isMinorFlavoured(scaleId) ? `natural-minor` : `major`;
+  return scaleNotes(noteAt(key), scale).some((n) => noteIndex(n) === mod12(note));
+}
+
+/**
+ * Notes in the key follow the key's spelling (B♭ in F). Notes outside it keep the accidental the
+ * chart was written with, so a "Bb" typed in C stays B♭ instead of turning into A♯.
+ */
+function renderRoot(index: number, written: string, ctx: TransposeContext): string {
   if (ctx.display === `numbers`) return NUMBER_NAMES[mod12(index - ctx.songKey)];
   const shift = semitoneShift(ctx) - (ctx.display === `shapes` ? ctx.capo - ctx.songCapo : 0);
   const target = mod12(index + shift);
-  const keyForSpelling = ctx.display === `shapes` ? ctx.playKey - ctx.capo : ctx.playKey;
+  const keyForSpelling = mod12(ctx.display === `shapes` ? ctx.playKey - ctx.capo : ctx.playKey);
+  if (!inKey(target, keyForSpelling, ctx.scaleId)) {
+    if (written === `b` || written === `♭`) return spellNote(target, true);
+    if (written === `#` || written === `♯`) return spellNote(target, false);
+  }
   return spellNote(target, prefersFlats(keyForSpelling, ctx.scaleId));
 }
 
@@ -59,8 +74,8 @@ export function transposeChord(token: string, ctx: TransposeContext): string | n
   if (!m) return null;
   const [, open, letter, acc, suffix, bassLetter, bassAcc, close] = m;
   const root = parseNote(letter, acc);
-  let out = `${open}${renderRoot(root, ctx)}${suffix}`;
-  if (bassLetter) out += `/${renderRoot(parseNote(bassLetter, bassAcc), ctx)}`;
+  let out = `${open}${renderRoot(root, acc, ctx)}${suffix}`;
+  if (bassLetter) out += `/${renderRoot(parseNote(bassLetter, bassAcc), bassAcc, ctx)}`;
   return out + close;
 }
 

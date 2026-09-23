@@ -35,6 +35,11 @@ const FLAT_MAJOR_KEYS = new Set([5, 10, 3, 8, 1]);
 const MINOR_FLAVOURED = new Set([`natural-minor`, `harmonic-minor`, `melodic-minor`, `minor-pentatonic`, `blues`, `dorian`, `phrygian`, `locrian`]);
 
 /** Whether a key is written with flats (judged by its relative major for minor-type scales). */
+/** Scales that sit on a minor tonic (their relative major sets the key signature). */
+export function isMinorFlavoured(scaleId: string): boolean {
+  return MINOR_FLAVOURED.has(scaleId);
+}
+
 export function prefersFlats(keyIndex: number, scaleId: string): boolean {
   const major = MINOR_FLAVOURED.has(scaleId) ? mod12(keyIndex + 3) : mod12(keyIndex);
   return FLAT_MAJOR_KEYS.has(major);

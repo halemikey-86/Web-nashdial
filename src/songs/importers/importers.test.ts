@@ -84,6 +84,48 @@ describe(`chord sheet import`, () => {
   });
 });
 
+describe(`chart PDF text (MultiTracks style)`, () => {
+  const text = `My Jesus
+Anne Wilson
+                              Key: F Tempo: 76 Time: 4/4
+ V1   Vp   C1   C2   Po   Rf   V2
+
+ V1 VERSE 1
+                                Piano softly in
+        F
+Are you past  the point of weary
+       Dm7
+Is your burden  weighing heavy
+
+ Po POST CHORUS
+                            Break on 3rd beat
+    B♭2
+And let  my Jesus change your life
+
+               V3 VERSE 3
+                                               Breakdown
+                          F
+              Who would take   my cross to calvary
+My Jesus
+                                                                   Page: 2/3`;
+  const song = parseChordSheet(text);
+
+  it(`reads the header and drops the roadmap and page furniture`, () => {
+    expect([song.title, song.artist, song.key, song.bpm, song.timeSignature]).toEqual([`My Jesus`, `Anne Wilson`, `F`, 76, `4/4`]);
+    expect(song.sections.map((s) => s.label)).toEqual([`Verse 1`, `Post Chorus`, `Verse 3`]);
+  });
+
+  it(`sends cues to notes but keeps lyrics under their chords`, () => {
+    const [v1, po, v3] = song.sections;
+    expect(v1.notes).toBe(`Piano softly in`);
+    expect(v1.chords.split(`\n`)).toHaveLength(4);
+    expect(v1.chords).toContain(`Is your burden`);
+    expect(po.notes).toBe(`Break on 3rd beat`);
+    expect(v3.notes).toBe(`Breakdown`);
+    expect(v3.chords.split(`\n`)[1]).toBe(`Who would take   my cross to calvary`);
+  });
+});
+
 describe(`ChordPro import`, () => {
   const src = `{title: Be Thou My Vision}
 {artist: Irish Trad.}

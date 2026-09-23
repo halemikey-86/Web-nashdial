@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import { Field, PageHeader, useToast } from '../components/ui';
 import { ScaleSelector } from '../components/Selectors';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { KEYS, CAPO_FRETS, asciiAccidentals, capoLabel, noteIndex, type NoteName } from '../music/notes';
+import { KEYS, CAPO_FRETS, asciiAccidentals, capoLabel, isMinorFlavoured, noteIndex, type NoteName } from '../music/notes';
 import { diatonicChords } from '../music/scales';
 import { INSTRUMENTS, TUNINGS, getTuning, midiName, openStringMidi, type Tuning } from '../music/tunings';
 import { Neck, NeckMarker } from '../components/Neck';
@@ -125,7 +125,11 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
   const chordsRef = useRef<HTMLTextAreaElement>(null);
   const tuning = getTuning(song.tuningId);
   const labels = stringLabels(tuning);
-  const palette = useMemo(() => diatonicChords(song.key, song.scaleId), [song.key, song.scaleId]);
+  // Pentatonic and blues scales have fewer than 7 notes; offer the full key's 7 chords instead.
+  const palette = useMemo(() => {
+    const chords = diatonicChords(song.key, song.scaleId);
+    return chords.length >= 7 ? chords : diatonicChords(song.key, isMinorFlavoured(song.scaleId) ? `natural-minor` : `major`);
+  }, [song.key, song.scaleId]);
   const set = <K extends keyof Section>(key: K, value: Section[K]) => onChange({ ...section, [key]: value });
 
   return (
@@ -197,8 +201,13 @@ function SectionEditor({ section, song, index, count, onChange, onMove, onDuplic
                   {c.label}
                 </button>
               ))}
-              <button type="button" className="chip-btn" onClick={() => insertAtCursor(chordsRef.current, section.chords, `|`, (v) => set(`chords`, v))}>
-                |
+              <button
+                type="button"
+                className="chip-btn chip-btn--bar"
+                onClick={() => insertAtCursor(chordsRef.current, section.chords, `|`, (v) => set(`chords`, v))}
+                title="Insert a bar line"
+              >
+                Bar |
               </button>
             </div>
             <textarea
