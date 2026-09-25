@@ -182,3 +182,204 @@ select.input,
 [data-theme='vox'] .key-dial__center-label {
   color: #111;
 }
+
+/* ==========================================================================
+   Contrast pass: every text colour reaches WCAG AA (4.5:1) on its own theme.
+   Measured per screen and theme with an automated audit.
+   ========================================================================== */
+
+/* Per-theme text tokens. */
+[data-theme='marshall'] {
+  --theme-text-muted: #000000c4;
+  --theme-label: #000000c4;
+  --theme-text-faint: #0000007a;
+  /* Insets lighten the gold instead of darkening it: dark text can't reach 4.5:1 on dark gold. */
+  --theme-control-bg: #ffffff38;
+  --theme-accent-text: #8a0e22;
+  --theme-relative-text: #3d2a66;
+  --theme-on-fret: #111;
+  --theme-on-fret-root: #7a0c1e;
+}
+[data-theme='orange'] {
+  --theme-text-muted: #000000b8;
+  --theme-label: #000000b8;
+  --theme-text-faint: #00000080;
+  --theme-accent-text: #a33b00;
+  --theme-relative-text: #6b3410;
+  --theme-on-fret: #111;
+  --theme-on-fret-root: #111;
+}
+[data-theme='mesa'] {
+  --theme-text-muted: #e0e0e0c7;
+  --theme-label: #e0e0e0c7;
+  --theme-text-faint: #c8c8c885;
+  --theme-accent-text: #ff7a7a;
+  --theme-relative-text: #a9bccf;
+  --theme-tab-active: linear-gradient(180deg, #6a6a6a 0%, #454545 100%);
+  --theme-fret-scale: #5c5c5c;
+  --theme-fret-scale-end: #3e3e3e;
+  --theme-fret-root: #dcdcdc;
+  --theme-fret-root-end: #ababab;
+  --theme-on-fret: #fff;
+  --theme-on-fret-root: #111;
+  /* Logo and tagline sit on the light diamond-plate grille. */
+  --theme-logo-color: #141414;
+  --theme-subtitle-color: #141414c7;
+}
+[data-theme='vox'] {
+  --theme-text-muted: #f5f0e0c7;
+  --theme-label: #e2c47e;
+  --theme-text-faint: #d4af5a8f;
+  --theme-accent-text: #e8c65c;
+  --theme-relative-text: #cfb088;
+  --theme-on-fret: #1a1408;
+  --theme-on-fret-root: #4a1020;
+  --theme-subtitle-color: #e6cc88;
+}
+
+/* Accent- and relative-coloured text uses the readable variants. */
+.nashville__number,
+.theory__degree,
+.theory__gap,
+.transpose-conversion__degree,
+.triad-picker__degree,
+.btn--danger,
+.btn--icon.btn--danger {
+  color: var(--theme-accent-text);
+}
+.nashville__cell--minor .nashville__number,
+.amp__brand-shape-key {
+  color: var(--theme-relative-text);
+}
+[data-theme='vox'] .btn--danger {
+  color: #ff9a8a;
+}
+
+/* Hard-coded translucent black that vanished on dark themes. */
+.nashville__cell--dim .nashville__chord,
+.nashville__cell--aug .nashville__chord,
+.nashville__cell--minor .nashville__chord,
+.transpose-conversion__from,
+.amp__brand-detail {
+  color: var(--theme-text-muted);
+  opacity: 1;
+}
+
+/* Fretboard note names sit on the lit cells, not on the panel. */
+.fretboard__cell--in-scale .fretboard__note-name {
+  color: var(--theme-on-fret);
+}
+.fretboard__cell--root .fretboard__note-name,
+.fretboard__cell--root.fretboard__cell--in-scale .fretboard__note-name {
+  color: var(--theme-on-fret-root);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Selected buttons: the text colour for the selected background wins over the generic button rules,
+   including muted parts inside them (degree numbers, labels). */
+:is(
+    .instrument-selector__btn--active,
+    .view-tabs__btn--active,
+    .fretboard-view-toggle__btn--active,
+    .chord-shapes__degree-btn--active,
+    .chord-shapes__shape-btn--active,
+    .capo-guide__option--on,
+    .btn--primary,
+    .segmented__btn--active,
+    .tab-editor__cell--active,
+    .tab-key--on,
+    .sheet__chip--key,
+    .stage__key-btn--open
+  ),
+:is(.chord-shapes__degree-btn--active, .chord-shapes__shape-btn--active, .fretboard-view-toggle__btn--active, .btn--primary, .segmented__btn--active) * {
+  color: var(--theme-on-active);
+  opacity: 1;
+}
+.segmented__btn.segmented__btn--active {
+  opacity: 1;
+}
+
+/* Bottom / top navigation. */
+.mode-nav__btn {
+  color: #ffffffd9;
+}
+[data-theme='orange'] .mode-nav__btn--active {
+  color: #111;
+  background: #ffe0c2;
+}
+
+/* Warm-up: finger numbers are pills in the finger's colour. */
+.ex-tab__finger {
+  width: 20px;
+  margin: 2px auto 0;
+  border-radius: 50%;
+}
+.finger__num {
+  stroke: none;
+}
+.ex-legend {
+  opacity: 1;
+}
+.ex-legend:not(.ex-legend--now) {
+  font-weight: 500;
+}
+.ex-level--advanced {
+  background: #c8102e;
+}
+
+/* Small helper text that used faint colours. */
+.shape-chip--all,
+.shape-chip__name {
+  color: var(--theme-text);
+}
+
+/* Circle-of-fifths minor keys and signatures on the dial ring. */
+[data-theme='marshall'] :is(.key-dial__cof-minor, .key-dial__cof-signature),
+[data-theme='orange'] :is(.key-dial__cof-minor, .key-dial__cof-signature) {
+  color: #000000d9;
+}
+[data-theme='marshall'] .key-dial__cof-major {
+  color: #111;
+}
+[data-theme='vox'] :is(.key-dial__cof-minor, .key-dial__cof-signature) {
+  color: #e2c47e;
+}
+
+/* Dimmed-but-readable states. */
+.theory__row--out {
+  opacity: 0.8;
+}
+.segmented__btn:not(.segmented__btn--active),
+.chip-btn--bar {
+  opacity: 1;
+}
+
+/* Orange's nav bar is bright orange: dark labels read, white ones don't. */
+[data-theme='orange'] .mode-nav__btn {
+  color: #000;
+}
+@media (width>=600px) {
+  [data-theme='orange'] .mode-nav__btn:not(.mode-nav__btn--active) {
+    color: #ffffffd9;
+  }
+}
+
+/* Marshall's selected dial slot was darkened gold; lighten it so the dark labels stay readable. */
+[data-theme='marshall'] .key-dial__cof-cell--selected {
+  background: #ffffff4d;
+}
+[data-theme='marshall'] .key-dial__cof-cell--selected :is(.key-dial__cof-minor, .key-dial__cof-signature) {
+  color: #000000d9;
+}
+[data-theme='orange'] {
+  --theme-accent-text: #7f2e00;
+}
+[data-theme='mesa'] .amp__subtitle {
+  color: #141414;
+}
+/* String names beside tabs. */
+.ex-tab__labels span,
+.tab-editor__labels span {
+  color: var(--theme-text);
+}

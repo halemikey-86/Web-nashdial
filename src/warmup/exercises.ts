@@ -166,6 +166,8 @@ export const EXERCISES: Exercise[] = [
 ];
 
 export const FINGER_COLORS: Record<Finger, string> = { 1: `#2f6fe0`, 2: `#35b84a`, 3: `#f08a1c`, 4: `#9b3fd6` };
+/** Readable number colour on each finger colour (dark on the light green/orange). */
+export const FINGER_TEXT: Record<Finger, string> = { 1: `#fff`, 2: `#10250f`, 3: `#1a1a1a`, 4: `#fff` };
 export const FINGER_NAMES: Record<Finger, string> = { 1: `Index`, 2: `Middle`, 3: `Ring`, 4: `Pinky` };
 
 export interface HandState {

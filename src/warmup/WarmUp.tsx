@@ -7,7 +7,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { openStringMidi, DEFAULT_TUNING } from '../music/tunings';
 import { navigate } from '../router';
 import { loadPref, savePref } from '../songs/storage';
-import { EXERCISES, FINGER_COLORS, FINGER_NAMES, handStates, type Exercise } from './exercises';
+import { EXERCISES, FINGER_COLORS, FINGER_NAMES, FINGER_TEXT, handStates, type Exercise } from './exercises';
 
 const STRINGS = 6;
 const OPEN_MIDI = openStringMidi(DEFAULT_TUNING);
@@ -45,7 +45,7 @@ function ExerciseTab({ exercise, index, onJump }: { exercise: Exercise; index: n
               </span>
             );
           })}
-          <span className="ex-tab__finger" style={{ color: FINGER_COLORS[step.finger] }}>
+          <span className="ex-tab__finger" style={{ background: FINGER_COLORS[step.finger], color: FINGER_TEXT[step.finger] }}>
             {step.finger}
           </span>
         </button>
@@ -113,7 +113,9 @@ function ExercisePlayer({ exercise }: { exercise: Exercise }) {
                 <g className="finger__lift">
                   <ellipse className="finger__shadow" cx={6} cy={10} rx={24} ry={20} />
                   <circle className="finger__tip" r={24} style={{ fill: FINGER_COLORS[n] }} />
-                  <text className="finger__num">{n}</text>
+                  <text className="finger__num" style={{ fill: FINGER_TEXT[n] }}>
+                    {n}
+                  </text>
                 </g>
                 {pos.pressed && <circle key={index} className="finger__ripple" r={26} style={{ stroke: FINGER_COLORS[n] }} />}
               </g>
@@ -130,7 +132,7 @@ function ExercisePlayer({ exercise }: { exercise: Exercise }) {
       <div className="ex-player__legend">
         {([1, 2, 3, 4] as const).map((n) => (
           <span key={n} className={`ex-legend${current.finger === n ? ` ex-legend--now` : ``}`}>
-            <span className="ex-legend__dot" style={{ background: FINGER_COLORS[n] }}>
+            <span className="ex-legend__dot" style={{ background: FINGER_COLORS[n], color: FINGER_TEXT[n] }}>
               {n}
             </span>
             {FINGER_NAMES[n]}
