@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChordShapes } from './components/ChordShapes';
 import { CapoGuide } from './components/CapoGuide';
 import { Fretboard, type FretboardBoard, type FretboardLabels, type FretboardView } from './components/Fretboard';
+import { SheetPanel } from './components/SheetPanel';
+import { SoloPanel } from './components/SoloPanel';
 import { TheoryPanel } from './components/TheoryPanel';
 import { PIECE_ORDER, type PieceType } from './music/tetrisShapes';
 import { loadPref, savePref } from './songs/storage';
@@ -23,12 +25,14 @@ import { SongLibrary } from './songs/SongLibrary';
 import { SetPlay, SongView, type OpenInDial } from './songs/StageRoutes';
 import { getTheme, loadTheme, saveTheme } from './themes';
 
-type MainView = 'fretboard' | 'chords' | 'theory';
+type MainView = 'fretboard' | 'chords' | 'sheet' | 'solo' | 'theory';
 type Mode = 'dial' | 'songs' | 'sets' | 'drums' | 'warmup' | 'tuner';
 
 const VIEW_OPTIONS: { id: MainView; label: string }[] = [
   { id: `fretboard`, label: `Fretboard` },
   { id: `chords`, label: `Chords` },
+  { id: `sheet`, label: `Sheet` },
+  { id: `solo`, label: `Solo` },
   { id: `theory`, label: `Theory` },
 ];
 
@@ -82,7 +86,13 @@ export function App() {
   const [instrument, setInstrument] = useState<InstrumentId>(DEFAULT_INSTRUMENT);
   const [tuningId, setTuningId] = useState(DEFAULT_TUNING.id);
   const [capo, setCapo] = useState(0);
-  const [view, setView] = useState<MainView>(`fretboard`);
+  const [view, setViewState] = useState<MainView>(`fretboard`);
+  // Taps on the Solo tab (the randomizer rolls a new solo on each); 0 until it is first opened.
+  const [soloTaps, setSoloTaps] = useState(0);
+  const setView = (v: MainView) => {
+    if (v === `solo`) setSoloTaps((n) => n + 1);
+    setViewState(v);
+  };
   const [fretView, setFretViewState] = useState<FretboardView>(() => loadPref<string>(`fret-view`, `blocks`) as FretboardView);
   const [board, setBoardState] = useState<FretboardBoard>(() => (loadPref<string>(`fret-board`, `grid`) === `neck` ? `neck` : `grid`));
   const [visiblePieces, setVisiblePieces] = useState<Set<PieceType>>(() => new Set(PIECE_ORDER));
@@ -178,8 +188,16 @@ export function App() {
               />
             ) : view === `chords` ? (
               <ChordShapes root={root} scaleId={scaleId} tuning={tuning} capoFret={capo} />
-            ) : (
+            ) : view === `sheet` ? (
+              <SheetPanel tuning={tuning} keyIndex={keyIndex} scaleId={scaleId} capo={capo} />
+            ) : view === `theory` ? (
               <TheoryPanel keyIndex={keyIndex} scaleId={scaleId} capo={capo} onPickCapo={setCapo} />
+            ) : null}
+            {/* Kept mounted once opened so the solo stays put when the randomizer is off. */}
+            {soloTaps > 0 && (
+              <div hidden={view !== `solo`}>
+                <SoloPanel tuning={tuning} root={root} scaleId={scaleId} capo={capo} taps={soloTaps} />
+              </div>
             )}
           </div>
         </section>

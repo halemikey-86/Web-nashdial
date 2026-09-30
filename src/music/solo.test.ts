@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { boxNotes, buildSoloPattern, soloPositions, soloScaleOptions, soloToTab } from './solo';
+import { boxNotes, buildSoloPattern, freshSolo, randomSolo, soloPositions, soloScaleOptions, soloToTab } from './solo';
+import { noteIndex } from './notes';
+import { scaleNotes } from './scales';
 import { DEFAULT_TUNING } from './tunings';
 
 describe(`solo ideas`, () => {
@@ -39,5 +41,33 @@ describe(`solo ideas`, () => {
     expect(pos.length).toBeGreaterThan(3);
     expect(pos.every((p) => p.fret >= 2)).toBe(true);
     expect(pos.some((p) => p.label.includes(`root position`))).toBe(true);
+  });
+
+  it(`makes random solos in the key that land on the root`, () => {
+    for (let i = 0; i < 200; i++) {
+      const solo = randomSolo(DEFAULT_TUNING, `G`, `major`, 0);
+      const cols = solo.block.steps.filter((s) => s !== `|`);
+      expect(cols).toHaveLength(32);
+      expect(solo.pitches).toHaveLength(32);
+      const played = solo.pitches.filter((p): p is number => p !== null);
+      // Every note belongs to one of the scales offered for the key (the blues adds its blue notes).
+      const offered = new Set(soloScaleOptions(`G`, `major`).flatMap((o) => scaleNotes(o.root, o.scaleId).map((n) => noteIndex(n))));
+      expect(played.every((p) => offered.has(p % 12))).toBe(true);
+      // The final note is the root of the scale it used (G, or E for the relative minor).
+      expect([noteIndex(`G`), noteIndex(`E`)]).toContain(played[played.length - 1] % 12);
+    }
+  });
+
+  it(`keeps random solo frets at or above the capo`, () => {
+    for (let i = 0; i < 100; i++) {
+      const cols = randomSolo(DEFAULT_TUNING, `A`, `natural-minor`, 3).block.steps.filter((s) => s !== `|`);
+      for (const col of cols) for (const c of col as ({ f: number } | null)[]) if (c) expect(c.f).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it(`never hands out the same solo twice`, () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 500; i++) freshSolo(seen, DEFAULT_TUNING, `E`, `minor-pentatonic`, 0);
+    expect(seen.size).toBe(500);
   });
 });

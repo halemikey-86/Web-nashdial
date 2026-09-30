@@ -246,3 +246,148 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* ---------- Dial: random solo ---------- */
+
+.solo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.solo-panel__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.solo-panel__bpm,
+.solo-panel__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--theme-text-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.solo-panel__bpm input {
+  width: 90px;
+}
+.solo-panel__label {
+  margin: 0;
+  font-weight: 700;
+}
+.solo-panel .solo-idea__tip {
+  font-size: 0.78rem;
+}
+.solo-panel__legend {
+  margin: 0;
+  color: var(--theme-text-muted);
+  font-size: 0.7rem;
+}
+
+/* ---------- Dial: standard notation ---------- */
+
+.staff {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  color: var(--theme-text);
+}
+.staff__system {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+}
+.staff__line,
+.staff__bar {
+  stroke: currentColor;
+  stroke-width: 1;
+  opacity: 0.75;
+}
+.staff__stem {
+  stroke: currentColor;
+  stroke-width: 1.3;
+}
+.staff__ink,
+.staff__glyph,
+.staff__time,
+.staff__eight {
+  fill: currentColor;
+}
+.staff__hollow {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.staff__time {
+  font: 900 17px/1 'Libre Baskerville', Georgia, serif;
+}
+.staff__eight {
+  font: 700 9px/1 Georgia, serif;
+}
+.staff__mark {
+  fill: var(--theme-text-muted);
+  font: 700 9px/1 system-ui, sans-serif;
+}
+.staff__name {
+  fill: var(--theme-text-muted);
+  font: 700 10px/1 system-ui, sans-serif;
+}
+.staff__note--tap {
+  cursor: pointer;
+}
+.staff__note--on {
+  color: var(--theme-accent);
+}
+.staff__note--on .staff__name {
+  fill: var(--theme-accent);
+}
+.sheet-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sheet-panel__key {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.sheet-panel__hints {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--theme-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.note-quiz {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--theme-control-border);
+}
+.note-quiz .staff {
+  max-width: 260px;
+}
+.note-quiz__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.note-quiz__wrong {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.note-quiz__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.staff__glyph {
+  font-variant-emoji: text;
+}

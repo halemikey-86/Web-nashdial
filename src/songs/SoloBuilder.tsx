@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { pluck, unlockAudio } from '../audio';
-import { SOLO_PATTERNS, boxNotes, buildSoloPattern, soloPositions, soloScaleOptions, soloToTab, type SoloDirection, type SoloPattern } from '../music/solo';
+import { SOLO_PATTERNS, boxNotes, buildSoloPattern, soloPositions, soloScaleOptions, soloToTab, type RandomSolo, type SoloDirection, type SoloPattern } from '../music/solo';
+import { nextSolo } from '../music/soloHistory';
 import { getTuning, openStringMidi } from '../music/tunings';
 import { newId } from './model';
 import { transposeTabBlock, type TransposeContext } from './songTranspose';
@@ -24,17 +25,28 @@ export interface SoloSettings {
 export function useSoloIdea(song: Song) {
   const tuning = getTuning(song.tuningId);
   const scales = useMemo(() => soloScaleOptions(song.key, song.scaleId), [song.key, song.scaleId]);
-  const [settings, setSettings] = useState<SoloSettings>({ scale: scales[0].id, position: -1, pattern: `threes`, direction: `up` });
+  const [settings, setSettingsState] = useState<SoloSettings>({ scale: scales[0].id, position: -1, pattern: `threes`, direction: `up` });
+  // A dice-roll solo replaces the pattern until a picker is touched again.
+  const [random, setRandom] = useState<RandomSolo | null>(null);
+  const setSettings = (next: SoloSettings) => {
+    setRandom(null);
+    setSettingsState(next);
+  };
+  const rollRandom = () => setRandom(nextSolo(tuning, song.key, song.scaleId, song.capo));
   const scale = scales.find((s) => s.id === settings.scale) ?? scales[0];
   const positions = useMemo(() => soloPositions(tuning, scale.root, scale.scaleId, song.capo), [tuning, scale, song.capo]);
   const position = positions.some((p) => p.fret === settings.position) ? settings.position : (positions[0]?.fret ?? song.capo);
 
   // A new song or scale starts from its first position.
   useEffect(() => {
-    setSettings((s) => ({ ...s, scale: scales.some((x) => x.id === s.scale) ? s.scale : scales[0].id, position: -1 }));
+    setSettingsState((s) => ({ ...s, scale: scales.some((x) => x.id === s.scale) ? s.scale : scales[0].id, position: -1 }));
   }, [song.id, scales]);
 
+  // A random solo is made for one key, tuning and capo; drop it when those change.
+  useEffect(() => setRandom(null), [song.id, song.key, song.scaleId, song.tuningId, song.capo]);
+
   const idea = useMemo<SoloIdea>(() => {
+    if (random) return { block: { ...random.block, id: `idea`, label: `Random solo · ${random.block.label}` }, tip: random.tip };
     const notes = buildSoloPattern(boxNotes(tuning, scale.root, scale.scaleId, position), settings.pattern, settings.direction);
     const group = SOLO_PATTERNS.find((p) => p.id === settings.pattern)?.group ?? 0;
     const perBar = group >= 3 ? group * 2 : 8;
@@ -47,16 +59,16 @@ export function useSoloIdea(song: Song) {
       },
       tip: scale.tip,
     };
-  }, [tuning, scale, position, settings.pattern, settings.direction, song.capo]);
+  }, [random, tuning, scale, position, settings.pattern, settings.direction, song.capo]);
 
-  return { settings, setSettings, scales, positions, position, idea, tuning };
+  return { settings, setSettings, scales, positions, position, idea, tuning, random: random !== null, rollRandom };
 }
 
 type Idea = ReturnType<typeof useSoloIdea>;
 
 /** The scale / position / pattern / direction pickers, plus play and save. */
 export function SoloControls({ idea, song, ctx, onSave }: { idea: Idea; song: Song; ctx?: TransposeContext; onSave?: (block: TabBlock) => void }) {
-  const { settings, setSettings, scales, positions, position, tuning } = idea;
+  const { settings, setSettings, scales, positions, position, tuning, random, rollRandom } = idea;
   const [playing, setPlaying] = useState(false);
   const timers = useRef<number[]>([]);
   const stop = () => {
@@ -118,6 +130,17 @@ export function SoloControls({ idea, song, ctx, onSave }: { idea: Idea; song: So
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        className={`btn btn--small${random ? ` btn--primary` : ``}`}
+        onClick={() => {
+          stop();
+          rollRandom();
+        }}
+        title="A made-up solo in the song's key — never the same one twice"
+      >
+        🎲 Random
+      </button>
       <button type="button" className="btn btn--small" onClick={play}>
         {playing ? `■ Stop` : `▶ Hear it`}
       </button>
